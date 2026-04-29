@@ -1,0 +1,97 @@
+{
+  "model": "random_forest",
+  "trained_at": "2026-04-26T19:01:32.147822",
+  "dataset": {
+    "n_windows": 471477,
+    "n_features": 88,
+    "n_instances": 1409
+  },
+  "cv": {
+    "strategy": "GroupKFold(n_splits=5)",
+    "scoring": "f1_macro",
+    "best_score_cv": 0.9558
+  },
+  "best_params": {
+    "n_estimators": 100,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+    "max_depth": null
+  },
+  "metrics_concat_folds": {
+    "f1_macro": 0.9529,
+    "f1_weighted": 0.9577,
+    "accuracy": 0.9579
+  },
+  "per_class": {
+    "0": {
+      "name": "Normal",
+      "precision": 0.9217,
+      "recall": 0.9752,
+      "f1": 0.9477,
+      "support": 72148
+    },
+    "1": {
+      "name": "Aumento Abrupto de BSW",
+      "precision": 0.9724,
+      "recall": 0.978,
+      "f1": 0.9752,
+      "support": 60497
+    },
+    "2": {
+      "name": "Fechamento Espúrio da DHSV",
+      "precision": 0.9832,
+      "recall": 0.8943,
+      "f1": 0.9366,
+      "support": 4767
+    },
+    "3": {
+      "name": "Golfadas Severas",
+      "precision": 0.9752,
+      "recall": 0.9415,
+      "f1": 0.9581,
+      "support": 32841
+    },
+    "4": {
+      "name": "Instabilidade de Fluxo",
+      "precision": 0.9409,
+      "recall": 0.9229,
+      "f1": 0.9318,
+      "support": 18218
+    },
+    "5": {
+      "name": "Perda Rápida de Produtividade",
+      "precision": 0.9745,
+      "recall": 0.9633,
+      "f1": 0.9689,
+      "support": 88079
+    },
+    "6": {
+      "name": "Restrição Rápida no PCK",
+      "precision": 0.9997,
+      "recall": 0.9891,
+      "f1": 0.9944,
+      "support": 38783
+    },
+    "7": {
+      "name": "Incrustação no PCK",
+      "precision": 0.9818,
+      "recall": 0.9488,
+      "f1": 0.965,
+      "support": 58099
+    },
+    "8": {
+      "name": "Hidrato na Linha de Produção",
+      "precision": 0.9704,
+      "recall": 0.8406,
+      "f1": 0.9008,
+      "support": 37826
+    },
+    "9": {
+      "name": "Hidrato na Linha de Serviço",
+      "precision": 0.9083,
+      "recall": 0.9961,
+      "f1": 0.9502,
+      "support": 60219
+    }
+  }
+}

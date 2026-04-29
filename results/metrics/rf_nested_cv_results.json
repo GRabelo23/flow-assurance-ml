@@ -1,0 +1,101 @@
+{
+  "model": "rf_nested_cv",
+  "run_at": "2026-04-27T19:22:44.717341",
+  "config": {
+    "n_outer_splits": 5,
+    "n_inner_splits": 3,
+    "n_iter_inner": 20,
+    "total_fits": 300,
+    "param_grid": {
+      "n_estimators": [
+        100,
+        200,
+        300
+      ],
+      "max_depth": [
+        null,
+        10,
+        20,
+        30
+      ],
+      "min_samples_leaf": [
+        1,
+        2,
+        4
+      ],
+      "max_features": [
+        "sqrt",
+        "log2"
+      ]
+    },
+    "note": "Grid identico ao flat CV para comparacao justa"
+  },
+  "outer_fold_scores": [
+    0.8883,
+    0.8415,
+    0.8743,
+    0.8624,
+    0.8996
+  ],
+  "mean_f1_macro": 0.8732,
+  "std_f1_macro": 0.0202,
+  "best_params_per_fold": [
+    {
+      "n_estimators": 300,
+      "min_samples_leaf": 2,
+      "max_features": "sqrt",
+      "max_depth": null
+    },
+    {
+      "n_estimators": 200,
+      "min_samples_leaf": 2,
+      "max_features": "sqrt",
+      "max_depth": 30
+    },
+    {
+      "n_estimators": 200,
+      "min_samples_leaf": 4,
+      "max_features": "log2",
+      "max_depth": 30
+    },
+    {
+      "n_estimators": 100,
+      "min_samples_leaf": 1,
+      "max_features": "log2",
+      "max_depth": null
+    },
+    {
+      "n_estimators": 300,
+      "min_samples_leaf": 4,
+      "max_features": "sqrt",
+      "max_depth": 30
+    }
+  ],
+  "mean_per_class_f1": {
+    "0": 0.9047,
+    "1": 0.9416,
+    "2": 0.9716,
+    "3": 0.9625,
+    "4": 0.916,
+    "5": 0.9788,
+    "6": 0.9904,
+    "7": 0.0048,
+    "8": 0.8595,
+    "9": 0.991,
+    "101": 0.9476,
+    "102": 0.7935,
+    "105": 0.8956,
+    "106": 0.977,
+    "107": 0.9006,
+    "108": 0.8459,
+    "109": 0.9632
+  },
+  "flat_cv_reference": {
+    "model": "rf_window_class",
+    "f1_macro_cv": 0.8827,
+    "strategy": "GroupKFold(n_splits=5)",
+    "n_iter_search": 20,
+    "note": "RandomizedSearchCV N_ITER=20, GroupKFold(5) — mesmo grid que o nested CV"
+  },
+  "delta_vs_flat_cv": -0.0095
+}

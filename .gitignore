@@ -1,0 +1,48 @@
+# ── Dados processados (muito grandes para o Git) ─────────────────────────────
+data/processed/*.parquet
+data/processed/*.csv
+
+# ── Modelos treinados (arquivos binários pesados) ─────────────────────────────
+results/models/*.joblib
+results/models/*.pkl
+
+# ── Dataset bruto da Petrobras (não redistribuir) ─────────────────────────────
+# Baixar em: https://github.com/ricardovvargas/3w_dataset
+3W/
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Ambientes virtuais ────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Sistema operacional ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs e temporários ────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak

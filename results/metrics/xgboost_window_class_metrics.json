@@ -1,0 +1,149 @@
+{
+  "model": "xgboost_window_class",
+  "trained_at": "2026-04-27T13:02:37.999428",
+  "dataset": {
+    "n_windows": 449397,
+    "n_features": 88,
+    "n_instances": 1409,
+    "n_classes": 17
+  },
+  "cv": {
+    "strategy": "GroupKFold(n_splits=5)",
+    "scoring": "f1_macro",
+    "best_score_cv": 0.8866
+  },
+  "best_params": {
+    "subsample": 0.8,
+    "n_estimators": 500,
+    "min_child_weight": 3,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    "colsample_bytree": 1.0
+  },
+  "metrics_concat_folds": {
+    "f1_macro": 0.9082,
+    "f1_weighted": 0.9361,
+    "accuracy": 0.9364
+  },
+  "per_class": {
+    "0": {
+      "name": "Normal",
+      "precision": 0.8903,
+      "recall": 0.9402,
+      "f1": 0.9145,
+      "support": 102040
+    },
+    "1": {
+      "name": "BSW (Ativo)",
+      "precision": 0.9345,
+      "recall": 0.9434,
+      "f1": 0.9389,
+      "support": 19305
+    },
+    "2": {
+      "name": "DHSV (Ativo)",
+      "precision": 0.9859,
+      "recall": 0.9601,
+      "f1": 0.9729,
+      "support": 2409
+    },
+    "3": {
+      "name": "Golfadas (Ativo)",
+      "precision": 0.9736,
+      "recall": 0.9613,
+      "f1": 0.9674,
+      "support": 32105
+    },
+    "4": {
+      "name": "Inst. Fluxo (Ativo)",
+      "precision": 0.8544,
+      "recall": 0.9481,
+      "f1": 0.8988,
+      "support": 12238
+    },
+    "5": {
+      "name": "Prod. Rapida (Ativo)",
+      "precision": 0.9834,
+      "recall": 0.9804,
+      "f1": 0.9819,
+      "support": 70018
+    },
+    "6": {
+      "name": "PCK Restrict. (Ativo)",
+      "precision": 0.9918,
+      "recall": 0.9883,
+      "f1": 0.9901,
+      "support": 25645
+    },
+    "7": {
+      "name": "PCK Incrust. (Ativo)",
+      "precision": 0.6824,
+      "recall": 0.4912,
+      "f1": 0.5712,
+      "support": 914
+    },
+    "8": {
+      "name": "Hidrato Prod. (Ativo)",
+      "precision": 0.8663,
+      "recall": 0.8337,
+      "f1": 0.8497,
+      "support": 4817
+    },
+    "9": {
+      "name": "Hidrato Serv. (Ativo)",
+      "precision": 0.9884,
+      "recall": 0.9907,
+      "f1": 0.9895,
+      "support": 21122
+    },
+    "101": {
+      "name": "BSW (Trans.)",
+      "precision": 0.922,
+      "recall": 0.9359,
+      "f1": 0.9289,
+      "support": 34991
+    },
+    "102": {
+      "name": "DHSV (Trans.)",
+      "precision": 0.8958,
+      "recall": 0.7705,
+      "f1": 0.8285,
+      "support": 937
+    },
+    "105": {
+      "name": "Prod. Rapida (Trans.)",
+      "precision": 0.9129,
+      "recall": 0.8679,
+      "f1": 0.8899,
+      "support": 16045
+    },
+    "106": {
+      "name": "PCK Restrict. (Trans.)",
+      "precision": 0.9741,
+      "recall": 0.981,
+      "f1": 0.9775,
+      "support": 10181
+    },
+    "107": {
+      "name": "PCK Incrust. (Trans.)",
+      "precision": 0.9208,
+      "recall": 0.8891,
+      "f1": 0.9047,
+      "support": 48982
+    },
+    "108": {
+      "name": "Hidrato Prod. (Trans.)",
+      "precision": 0.9377,
+      "recall": 0.8156,
+      "f1": 0.8724,
+      "support": 27934
+    },
+    "109": {
+      "name": "Hidrato Serv. (Trans.)",
+      "precision": 0.9742,
+      "recall": 0.9518,
+      "f1": 0.9628,
+      "support": 19714
+    }
+  }
+}
