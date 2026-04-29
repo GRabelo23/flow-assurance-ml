@@ -367,6 +367,7 @@ Todas as constantes do projeto ficam centralizadas em `config.py`. Os principais
 ## Autor
 
 **Gabriel Rabelo**
+
 Engenharia Mecatrônica — Universidade de Brasília (UnB)
 Contato: rabelogabriel23@gmail.com
 
