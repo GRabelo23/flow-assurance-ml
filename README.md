@@ -369,9 +369,11 @@ Todas as constantes do projeto ficam centralizadas em `config.py`. Os principais
 **Gabriel Rabelo**
 
 Engenharia Mecatrônica — Universidade de Brasília (UnB)
+
 Contato: rabelogabriel23@gmail.com
 
 **Dataset:** 3W Dataset — Petrobras / Ricardo Vargas et al.
+
 Referência: [github.com/ricardovvargas/3w_dataset](https://github.com/ricardovvargas/3w_dataset)
 
 ---
