@@ -108,14 +108,6 @@ Se missing_ratio > 0.50 → instância descartada
 
 Isso elimina poços com dados tão fragmentados que qualquer análise seria especulativa. O limiar de 50% é conservador: mantém instâncias com falhas de sensor pontuais, descarta apenas as cronicamente ausentes.
 
-### 2.4 O que NÃO é feito (e por quê)
-
-| Operação | Motivo para não fazer |
-|----------|-----------------------|
-| Remoção de outliers | Picos de pressão são a assinatura das falhas — removê-los destruiria o sinal |
-| Interpolação | Inventar valores entre medições distantes não é fisicamente realista |
-| Normalização global | Poços operam em faixas absolutas distintas; normalizar globalmente vaza informação entre poços |
-
 ---
 
 ## 3. Normalização por Instância (Z-score)
