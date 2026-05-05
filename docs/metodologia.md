@@ -120,16 +120,6 @@ Antes de extrair features, cada série temporal é normalizada **por instância 
 x_norm = (x - média_instância) / desvio_padrão_instância
 ```
 
-### Por que por instância e não global?
-
-Considere dois poços:
-- Poço A opera normalmente a 50 bar de pressão
-- Poço B opera normalmente a 200 bar de pressão
-
-Se normalizarmos globalmente, o modelo aprenderá que "pressão alta = poço B". Mas o que interessa é o **padrão de mudança**: a pressão do Poço A subiu 20% acima do seu próprio normal? Isso é anomalia — independente do valor absoluto.
-
-Ao normalizar por instância, o modelo aprende padrões relativos (mudanças, tendências, variações) que generalizam para qualquer poço.
-
 ### Tratamento de sensores constantes
 
 Sensores com desvio padrão menor que 1×10⁻¹⁰ (travados em um valor fixo) são tratados como um caso especial:
@@ -139,7 +129,7 @@ if std < 1e-10:
     df[sensor] = 0.0  # centraliza em zero, mantém variação = 0
 ```
 
-Isso evita divisão por zero e garante que um sensor desligado (valor=0) e um sensor travado em 38 MPa produzam o mesmo resultado de features — ambos mostram variação zero, que é a informação relevante.
+Isso evita divisão por zero e garante que um sensor desligado (valor=0) e um sensor travado em 38 MPa produzam o mesmo resultado de features (ambos mostram variação zero, que é a informação relevante).
 
 ---
 
@@ -206,15 +196,11 @@ Para cada janela de 300 s, e para cada um dos 8 sensores, são extraídas **11 f
 | `diff2_std` | Desvio padrão da 2ª derivada | Aceleração de variação (mudanças abruptas) |
 | `max_zscore` | max(\|x − μ\| / σ) | Pico máximo em unidades de desvio padrão |
 
-### 5.2 Por que preservar outliers como max_zscore?
-
-Em falhas de escoamento, um pico abrupto de pressão **é** o sinal da falha — não é ruído. Removê-lo seria descartar exatamente o que o modelo precisa detectar. A feature `max_zscore` captura a magnitude do pico mais extremo da janela, transformando um outlier em informação estruturada.
-
 ### 5.3 Tratamento de janelas quase vazias
 
-Quando um sensor tem menos de 10 leituras válidas (não-NaN) dentro de uma janela de 300 s — por exemplo, um sensor offline por quase toda a janela — não há dados suficientes para calcular estatísticas confiáveis. Nesse caso, todas as 11 features daquele sensor recebem `NaN` para aquela janela.
+Quando um sensor tem menos de 10 leituras válidas (não-NaN) dentro de uma janela de 300 s, por exemplo, um sensor offline por quase toda a janela — não há dados suficientes para calcular estatísticas confiáveis. Nesse caso, todas as 11 features daquele sensor recebem `NaN` para aquela janela.
 
-Após a extração, a matriz X (janelas × features) pode conter NaN em posições onde sensores estavam ausentes. Esses NaN são preenchidos antes do treinamento por um `SimpleImputer(strategy='median')`, que substitui cada NaN pela **mediana daquela feature calculada sobre todas as janelas do dataset** — não pela mediana interna da janela com problema.
+Após a extração, a matriz X (janelas × features) pode conter NaN em posições onde sensores estavam ausentes. Esses NaN são preenchidos antes do treinamento por um `SimpleImputer(strategy='median')`, que substitui cada NaN pela mediana daquela feature calculada sobre todas as janelas.
 
 Exemplo: se `P-TPT_mean` for NaN em uma janela (sensor ausente naquele período), o valor imputado é a mediana de `P-TPT_mean` calculada sobre todas as ~449.000 janelas do dataset. A lógica é conservadora: assume-se o valor mais típico disponível para aquela feature.
 
@@ -223,23 +209,6 @@ O imputer é salvo em `.joblib` junto com o modelo para garantir que a mesma tra
 ---
 
 ## 6. Estratégias de Rotulagem
-
-Foram implementadas duas estratégias de rotulagem que geram dois datasets distintos para duas tarefas de classificação complementares.
-
-### 6.1 Abordagem 1 — Rotulagem por Instância
-
-**Arquivo:** `data/processed/features.parquet`
-**Label:** `fault_class` — a classe do evento do poço inteiro (0–9)
-
-Cada janela herda a classe do poço ao qual pertence. Uma janela extraída de um poço de classe 3 (Golfadas) recebe label=3, independentemente do estado instantâneo naquela janela.
-
-**Pergunta respondida:** "Dado um histórico de sensores desse poço, qual tipo de falha ele apresenta?"
-
-**Uso:** Diagnóstico retroativo — classificar o tipo de evento após análise da série completa.
-
-**10 classes:** Normal, BSW, DHSV, Golfadas, Instabilidade de Fluxo, Prod. Rápida, PCK Restrição, PCK Incrustação, Hidrato Produção, Hidrato Serviço.
-
-### 6.2 Abordagem 2 — Rotulagem por Estado Operacional
 
 **Arquivo:** `data/processed/features_window_class.parquet`
 **Label:** `window_label` — a moda da coluna `class` dentro daquela janela
@@ -251,24 +220,10 @@ if valid_states.empty:
 window_label = int(valid_states.mode().iloc[0])
 ```
 
-**Pergunta respondida:** "Qual é o estado operacional do poço neste momento?"
-
-**Uso:** Monitoramento em tempo real — detectar a progressão: Normal → Transiente → Evento Ativo.
-
 **17 classes encontradas no dataset:** 0 (Normal), 1–9 (Ativo por tipo), 101–109 (Transiente por tipo).
 Classes 103 e 104 (transientes de Golfadas e Instabilidade de Fluxo) não aparecem no dataset — nessas falhas, o sinal vai de normal direto para o estado ativo sem transiente registrado.
 
 **Janelas descartadas:** aquelas onde 100% dos timestamps têm `class=NaN` (período pré-evento puro). Essas janelas não têm estado definido e não contribuem para nenhuma das 17 classes.
-
-### 6.3 Comparação das abordagens
-
-| Aspecto | Abordagem 1 (Instância) | Abordagem 2 (Estado) |
-|---------|------------------------|---------------------|
-| Label de uma janela normal antes da falha | classe do evento (ex: 3) | 0 (Normal) |
-| Label de um transiente | classe do evento (ex: 3) | 103 (Transiente tipo 3) |
-| Label do estado ativo | classe do evento (ex: 3) | 3 (Ativo tipo 3) |
-| Janelas pré-evento | incluídas com label errado | descartadas |
-| Aplicação | Diagnóstico | Monitoramento em tempo real |
 
 ---
 
@@ -279,7 +234,7 @@ Classes 103 e 104 (transientes de Golfadas e Instabilidade de Fluxo) não aparec
 
 ### 7.1 O problema de data leakage em séries temporais
 
-Se dividirmos as janelas aleatoriamente (KFold padrão), janelas do **mesmo poço** aparecem tanto no treino quanto no teste. O modelo "memoriza" aquele poço e parece ter desempenho excelente — mas falha em poços novos. Isso é **data leakage** (vazamento de dados), um erro metodológico grave.
+Se dividirmos as janelas aleatoriamente (KFold padrão), janelas do **mesmo poço** aparecem tanto no treino quanto no teste. O modelo memoriza aquele poço e parece ter bom desempenho, mas falha em poços novos (**Data Leakage**)
 
 ### 7.2 A solução: GroupKFold por instance_id
 
@@ -297,7 +252,7 @@ Se dividirmos as janelas aleatoriamente (KFold padrão), janelas do **mesmo poç
 Cada poço aparece em exatamente 1 fold de teste.
 ```
 
-As métricas finais (F1-macro, accuracy) refletem o desempenho em **poços completamente novos** — nunca vistos pelo modelo durante o treinamento. Isso é o que importa para aplicação real.
+As métricas finais (F1-macro, accuracy) refletem o desempenho em **poços completamente novos** — nunca vistos pelo modelo durante o treinamento.
 
 ### 7.3 Modelo final
 
@@ -318,15 +273,7 @@ Passo 2 — Avaliação final (cross_val_predict):
   Usa os MESMOS 1.409 poços e os MESMOS folds para reportar as métricas.
 ```
 
-O problema: os hiperparâmetros foram escolhidos **justamente porque funcionaram bem nesses folds específicos**. Avaliar com os mesmos folds produz métricas ligeiramente otimistas — o modelo foi, indiretamente, ajustado para essa partição dos dados.
-
-**Comparação com o vazamento grave (sem GroupKFold):**
-
-| | Sem GroupKFold | Vazamento de hiperparâmetros |
-|---|---|---|
-| O que vaza | Janelas do mesmo poço em treino e teste | Escolha de hiperparâmetros influenciada pelo conjunto de teste |
-| Gravidade | Alta — o modelo memoriza o poço | Baixa — hiperparâmetros robustos mudam pouco entre partições |
-| Efeito típico | F1 inflado em 10–30% | F1 inflado em ~1–2% |
+O problema: os hiperparâmetros foram escolhidos **justamente porque funcionaram bem nesses folds específicos**. Avaliar com os mesmos folds produz métricas ligeiramente otimistas — o modelo foi, indiretamente, ajustado para esse conjunto de dados.
 
 **A solução correta: Validação Cruzada Aninhada (Nested Cross-Validation)**
 
@@ -341,7 +288,7 @@ Loop externo — GroupKFold(5):
 Resultado: 5 scores verdadeiramente independentes
 ```
 
-**Resultados do Nested CV — RF Estado Operacional (Abordagem 2):**
+**Resultados do Nested CV — Random Forest:**
 
 O nested CV foi executado com configuração idêntica ao flat CV (mesmo grid, N\_ITER=20), adicionando apenas o loop externo de proteção. Total: 300 treinamentos (~6 horas).
 
@@ -364,7 +311,7 @@ O nested CV foi executado com configuração idêntica ao flat CV (mesmo grid, N
 
 - O viés de seleção de hiperparâmetros é **real e mensurável**, mas pequeno: o flat CV superestima o desempenho em 0,95% de F1-macro
 - **Nenhuma classe individual foi distorcida de forma relevante**: todas as diferenças por classe estão abaixo de ±0,03
-- A Classe 7 (PCK Incrustação Ativo, F1≈0,009 no flat CV e ≈0,005 no nested CV) confirma que o problema dessa classe é estrutural — apenas 914 janelas (0,2% do dataset) — e não um artefato do método de avaliação
+- A Classe 7 (PCK Incrustação Ativo, F1≈0,009 no flat CV e ≈0,005 no nested CV) confirma que o problema dessa classe é estrutural — apenas 914 janelas (0,2% do dataset) 
 - O desvio padrão de ±0,0202 entre os folds externos reflete a variabilidade natural entre grupos de poços: alguns grupos contêm poços mais difíceis de generalizar (Fold 2: F1=0,8415) e outros mais representativos (Fold 5: F1=0,8996)
 - **Conclusão:** A metodologia de flat CV com GroupKFold(5) é essencialmente honesta para este dataset. As comparações entre modelos são válidas, pois todos foram avaliados sob a mesma metodologia e o viés afeta todos igualmente.
 
@@ -372,17 +319,7 @@ O nested CV foi executado com configuração idêntica ao flat CV (mesmo grid, N
 
 ## 8. Tratamento do Desbalanceamento de Classes
 
-### 8.1 Abordagem 1 (10 classes) — desbalanceamento moderado
-
-| Classe | Janelas (aprox.) | % do total |
-|--------|:----------------:|:----------:|
-| 5 (Prod. Rápida) | 88.079 | 18,7% |
-| 0 (Normal) | 72.148 | 15,3% |
-| 2 (DHSV) | 4.767 | 1,0% |
-
-Desbalanceamento de ~18:1 entre a maior e menor classe.
-
-### 8.2 Abordagem 2 (17 classes) — desbalanceamento severo
+### 17 classes — desbalanceamento severo
 
 | Classe | Janelas | % do total |
 |--------|:-------:|:----------:|
@@ -393,7 +330,7 @@ Desbalanceamento de ~18:1 entre a maior e menor classe.
 
 Desbalanceamento de ~112:1 entre a maior e menor classe.
 
-### 8.3 Estratégia adotada: class_weight='balanced'
+### 8.2 Estratégia adotada: class_weight='balanced'
 
 O scikit-learn calcula automaticamente pesos inversamente proporcionais à frequência de cada classe:
 
@@ -401,17 +338,9 @@ O scikit-learn calcula automaticamente pesos inversamente proporcionais à frequ
 peso_classe_c = n_total_amostras / (n_classes × n_amostras_classe_c)
 ```
 
-Isso faz com que erros em classes raras "pesem" mais durante o treinamento. É a estratégia mais simples e eficaz para árvores de decisão.
+Isso faz com que erros em classes raras pesem mais durante o treinamento. É a estratégia mais simples e eficaz para árvores de decisão.
 
-### 8.4 Por que NÃO usar SMOTE?
-
-SMOTE (Synthetic Minority Over-sampling Technique) cria amostras sintéticas interpolando features de amostras reais. Para dados tabulares genéricos, funciona bem. Para sensores físicos de poços de petróleo, **não é adequado**:
-
-- Interpolar features (média, desvio padrão, derivada) entre dois transientes distintos não produz um transiente fisicamente realista
-- Um transiente sintético gerado por SMOTE pode ter combinações de features impossíveis na realidade
-- `class_weight='balanced'` é mais seguro e igualmente eficaz para modelos baseados em árvores
-
-### 8.5 Métrica principal: F1-macro
+### 8.3 Métrica principal: F1-macro
 
 Em vez de usar acurácia (que ignora classes raras), a métrica principal é o **F1-macro**:
 
@@ -455,9 +384,9 @@ A própria `RandomizedSearchCV` usa `GroupKFold` internamente — garantindo que
 
 ### 10.1 Random Forest
 
-**Justificativa:** Método ensemble baseado em árvores de decisão. Naturalmente robusto a overfitting (por bagging), não requer normalização das features e fornece importância de features diretamente. É a referência padrão de mercado para dados tabulares.
+**Justificativa:** Método ensemble baseado em árvores de decisão. Naturalmente robusto a overfitting (por bagging), não requer normalização das features e fornece importância de features diretamente. É a referência padrão da literatura para dados tabulares.
 
-**Treinamento:** `scripts/train_random_forest.py` (abordagem 1) e `scripts/train_rf_window_class.py` (abordagem 2)
+**Treinamento:**  `scripts/train_rf_window_class.py` 
 
 ### 10.2 XGBoost
 
@@ -465,13 +394,92 @@ A própria `RandomizedSearchCV` usa `GroupKFold` internamente — garantindo que
 
 **Diferença técnica em relação ao RF:** XGBoost não suporta `class_weight` diretamente. Os pesos de classe são calculados via `compute_sample_weight('balanced', y)` e passados como `sample_weight` ao `fit()`. Além disso, os labels 101–109 precisam ser remapeados para o intervalo contíguo [0, 16] via `LabelEncoder` antes do treinamento (exigência da API `multi:softmax`).
 
-**Treinamento:** `scripts/train_xgboost_window_class.py` (abordagem 2)
+**Treinamento:** `scripts/train_xgboost_window_class.py` 
 
-### 10.3 MLP — Multilayer Perceptron (a treinar)
+### 10.3 CNN-1D — Rede Convolucional 1D (FCN)
 
-**Justificativa:** Rede neural densa (totalmente conectada). Captura relações não-lineares complexas entre as 88 features. Implementado via `sklearn.neural_network.MLPClassifier` para comparabilidade direta com RF e XGBoost.
+**Referência de arquitetura:** Wang et al. (2017) — *Time Series Classification from Scratch with Deep Neural Networks: A Strong Baseline*
 
-**Diferença dos modelos baseados em árvores:** requer normalização (`StandardScaler`) porque gradiente descendente é sensível à escala das features.
+**Justificativa:** Os modelos RF e XGBoost operam sobre **88 features artesanais** extraídas manualmente das janelas de sensores. A CNN-1D recebe diretamente a **série temporal bruta** como entrada e aprende suas próprias representações durante o treinamento, sem extração manual de features. Isso cria uma comparação metodológica fundamental: features manuais versus representações aprendidas automaticamente.
+
+A arquitetura escolhida é a **FCN (Fully Convolutional Network)**, baseline neural estado da arte para classificação de séries temporais em benchmarks UCR/UEA (Fawaz et al., 2019). Vantagens em relação a LSTM e Transformer:
+- Sem recorrência → treino paralelizável e mais rápido
+- `GlobalAveragePooling1D` elimina hiperparâmetro de tamanho de saída
+- Desempenho competitivo com menor custo computacional
+
+**Implementação:** `scripts/train_cnn1d_v2.py`
+
+#### Arquitetura FCN
+
+```
+Input: (batch, 300, 8)   ← janela bruta após Z-score + filtro Gaussiano (sigma=2.0)
+│
+├─ Conv1D(128 filtros, kernel=8, padding='same', use_bias=False)
+│  BatchNormalization → ReLU
+│
+├─ Conv1D(256 filtros, kernel=5, padding='same', use_bias=False)
+│  BatchNormalization → ReLU
+│
+├─ Conv1D(128 filtros, kernel=3, padding='same', use_bias=False)
+│  BatchNormalization → ReLU
+│
+├─ GlobalAveragePooling1D()   → (batch, 128)
+│
+└─ Dense(17, activation='softmax')
+```
+
+Os kernels decrescentes (8→5→3) capturam padrões em múltiplas escalas temporais: o kernel largo detecta tendências de médio prazo, e os menores detectam transições locais. O `use_bias=False` nas camadas convolucionais é adequado porque o `BatchNormalization` subsequente já possui seu próprio parâmetro de deslocamento (`beta`), tornando o bias redundante.
+
+#### Pré-processamento para a CNN
+
+O pré-processamento é o mesmo usado no RF/XGBoost — Z-score por instância e filtro Gaussiano (sigma=2.0) — mas aplicado à **série temporal completa** antes da extração de janelas, não às janelas individuais. A normalização é feita em numpy puro e o resultado é mantido em memória como cache durante todo o treinamento (funções `preprocess_instance` e `extract_windows` no script).
+
+#### Pipeline de Dados — `tf.data`
+
+Com ~457.000 janelas × 300 timesteps × 8 sensores × 4 bytes ≈ 4,4 GB, materializar todas as janelas de treino em RAM ao mesmo tempo é inviável. A solução é um pipeline gerador via `tf.data`:
+
+```
+from_generator → shuffle(buffer=20.000) → repeat() → map(sample_weight) → batch(256) → prefetch(AUTOTUNE)
+```
+
+| Etapa | Função |
+|-------|--------|
+| `from_generator` | Produz uma janela por vez — nunca aloca o dataset completo em RAM |
+| `shuffle(20.000)` | Mantém 20.000 janelas em buffer (~190 MB) para aleatorização eficiente |
+| `repeat()` | Faz o gerador recomeçar antes que o buffer esvazie, mantendo-o sempre aquecido |
+| `map(tf.gather)` | Adiciona o peso de classe a cada janela via indexação vetorizada |
+| `batch(256)` | Agrupa 256 janelas em tensor `(256, 300, 8)` para envio à GPU |
+| `prefetch(AUTOTUNE)` | CPU prepara o próximo lote enquanto GPU processa o atual |
+
+O `.repeat()` é crítico para evitar o padrão de épocas alternadamente lentas/rápidas: sem ele, o buffer esvazia ao fim de cada época e leva ~325 s para ser repreenchido. Com `.repeat()`, o gerador recomeça antes do esvaziamento e todas as épocas levam ~40 s.
+
+#### Balanceamento de Classes
+
+O argumento `class_weight` do `model.fit()` do Keras não é compatível com `tf.data.Dataset`. A alternativa é incluir o peso como terceiro elemento de cada amostra (`sample_weight`), adicionado via `tf.gather` no estágio `.map()` do pipeline:
+
+```python
+cw_tensor = tf.constant([cw_dict.get(i, 1.0) for i in range(N_CLASSES)], dtype=tf.float32)
+ds = ds.map(lambda x, y: (x, y, tf.gather(cw_tensor, tf.cast(y, tf.int32))))
+```
+
+Os pesos são calculados por `compute_class_weight('balanced', ...)` sobre as instâncias de treino de cada fold, da mesma forma que no RF e XGBoost.
+
+#### Validação e Treino
+
+A separação treino/teste usa o mesmo `GroupKFold(5)` por `instance_id`. Dentro do conjunto de treino de cada fold, **10% das instâncias** são separadas como validação (`val_iids`) e materializadas em numpy (`X_val`, `y_val`) para uso direto nos callbacks.
+
+| Hiperparâmetro | Valor | Justificativa |
+|----------------|-------|---------------|
+| Optimizer | Adam (lr=1e-3) | Padrão para redes neurais — adaptativo por parâmetro |
+| Loss | sparse_categorical_crossentropy | Aceita labels inteiros (sem conversão one-hot) |
+| Épocas máx. | 100 | EarlyStopping interrompe antes se val_f1_macro estagnar |
+| EarlyStopping | patience=10, restore_best_weights=True | Restaura os pesos da melhor época |
+| ReduceLROnPlateau | patience=5, factor=0.5, min_lr=1e-5 | Reduz lr à metade antes do Early Stopping |
+| Batch size | 256 | Equilíbrio entre velocidade de GPU e frequência de atualização |
+
+O `steps_per_epoch` é calculado como `n_janelas_treino // 256`, informando ao Keras quando encerrar cada época em um dataset infinito (`.repeat()`).
+
+**Hardware utilizado:** GPU RTX 2060 (6 GB VRAM) via TensorFlow 2.x com XLA habilitado. Tempo estimado de treinamento: ~1 hora para os 5 folds completos.
 
 ---
 
@@ -524,7 +532,7 @@ O MDI mede, para cada feature, o quanto ela reduziu a impureza (Gini) ao longo d
 
 ### 12.2 SHAP — SHapley Additive exPlanations
 
-SHAP é a técnica padrão-ouro de XAI para modelos tabulares. Baseado na teoria dos jogos cooperativos (valores de Shapley), atribui a cada feature sua contribuição **marginal e justa** para cada predição individual.
+SHAP é a técnica padrão de XAI para modelos tabulares. Esse método atribui a cada feature sua contribuição para cada predição individual.
 
 ```
 SHAP value da feature j para a amostra i =
@@ -607,84 +615,250 @@ As features de **variabilidade e taxa de variação** da temperatura no topo (`T
 
 O sensor **T-TPT** (temperatura no topo da árvore de natal / TPT) é o mais informativo em ambos os modelos. O sensor **T-PDG** (temperatura no fundo do poço) é o menos relevante — a temperatura de fundo varia pouco entre estados operacionais, pois está próxima à rocha reservatório. O ranking é praticamente idêntico entre RF e XGBoost, validando a robustez dos achados.
 
-### 12.6 Análise de Classes Desbalanceadas — Classes 7 e 102
+---
 
-#### Classe 7 — PCK Incrustação Ativo (RF F1=0,009 | XGBoost F1=0,571)
+## 13. Estudo do Impacto da Filtragem de Sinal
 
-A classe 7 é a mais crítica do dataset do ponto de vista de desbalanceamento: **914 janelas em 449.397 (0,2%)**. A análise SHAP revela por que os dois modelos respondem de forma radicalmente diferente.
+### 13.1 Motivação
 
-**RF — colapso completo (F1=0,009):**
-Os SHAP values do RF para a classe 7 estão confinados no intervalo **−0,04 a +0,10**, praticamente zero para todas as features. O modelo simplesmente não prediz essa classe. O mecanismo é estrutural: o RF constrói todas as 200 árvores em paralelo, via *bagging* (amostras bootstrap com reposição). Em cada bootstrap, a classe 7 representa ~0,2% das amostras. Mesmo com `class_weight='balanced'`, o peso não compensa a ausência de co-ocorrências com outras features nos galhos mais profundos das árvores — a classe rara desaparece do processo de divisão.
+O pipeline padrão aplica um filtro Gaussiano (`sigma=2.0`) sobre cada sensor antes de
+calcular as 11 estatísticas por janela. Esse filtro remove variações de alta frequência
+(ruído elétrico, vibrações mecânicas), mas também pode atenuar transientes rápidos que
+são assinaturas de certas falhas.
 
-**XGBoost — detecção parcial (F1=0,571):**
-Os SHAP values do XGBoost para a classe 7 têm escala **−4 a +3**, revelando features discriminativas reais. As mais importantes são:
+Para quantificar o impacto dessa decisão de pré-processamento, foi conduzido um
+estudo de comaparação: o XGBoost foi retreinado com os dados brutos (sem nenhuma filtragem)
+e os resultados foram comparados diretamente com o modelo treinado com filtro Gaussiano.
+Essa comparação isola o efeito do filtro, mantendo idênticos o modelo, os hiperparâmetros
+(mesma busca RandomizedSearchCV), a separação GroupKFold e o balanceamento de classes.
 
-| Feature | Direção | Interpretação física |
-|---------|---------|----------------------|
-| `T-JUS-CKP_max` | Alto → classe 7 | Temperatura máxima a jusante da válvula choke elevada |
-| `P-MON-CKP_mean` | Alto → classe 7 | Pressão média no manifold elevada |
-| `T-TPT_min` | Baixo → classe 7 | Temperatura mínima no topo reduzida |
-| `P-MON-CKP_min` | Alto → classe 7 | Pressão mínima no manifold sustentada |
+### 13.2 Diferença Metodológica
 
-**Interpretação física:** a incrustação no PCK (válvula choke de produção) é o acúmulo progressivo de depósitos minerais (escala) que restringe o orifício da válvula. A restrição altera o gradiente de pressão ao longo da válvula e modifica o efeito Joule-Thomson (resfriamento por expansão). Como consequência: (a) a pressão no manifold (P-MON-CKP) cresce porque o fluxo está represado a montante da restrição, e (b) a temperatura a jusante (T-JUS-CKP) sobe porque a expansão de gás — que normalmente resfria o fluido — é reduzida pela restrição mecânica. Esses dois padrões combinados são a "assinatura digital" da incrustação no PCK, e o XGBoost, via boosting sequencial, aprendeu a identificá-la.
+| Configuração | Parâmetro `smooth_filter` | Pré-processamento do sinal |
+|---|---|---|
+| XGBoost Gaussiano | `'gaussian'` | `gaussian_filter1d(sigma=2.0)` antes de cada janela |
+| XGBoost Sem Filtro | `'none'` | Sinal z-scored diretamente para extração de features |
 
-**Por que o boosting supera o bagging aqui:** no boosting, cada nova árvore é treinada especificamente sobre os **erros residuais** das árvores anteriores. Quando as 914 janelas da classe 7 são sistematicamente mal classificadas nas primeiras iterações, as iterações seguintes recebem gradientes elevados para essas amostras — forçando o modelo a encontrar features discriminativas mesmo numa minoria extrema.
+O parâmetro foi implementado em `src/feature_engineering.py` e propagado por todo o
+pipeline (`extract_features_from_instance`, `run_pipeline_from_cleaned`). O dataset
+resultante foi salvo em `data/processed/features_nofilter_window_class.parquet` (449.397
+janelas, 88 features — idêntico ao dataset filtrado em estrutura).
+
+**Melhores hiperparâmetros encontrados (sem filtro):**
+`n_estimators=500, max_depth=4, learning_rate=0.1, subsample=0.8,
+colsample_bytree=1.0, min_child_weight=3`
+
+### 13.3 Resultados Comparativos
+
+**Métricas globais:**
+
+| Métrica | XGBoost Gaussiano | XGBoost Sem Filtro | Delta |
+|---|---|---|---|
+| F1-macro | **0.9082** | 0.9065 | −0.0017 |
+| F1-weighted | **0.9340** | 0.9339 | −0.0001 |
+| Accuracy | 0.9364 | **0.9345** | −0.0019 |
+| F1-macro (CV) | 0.8866 | **0.8890** | +0.0024 |
+
+O impacto global é mínimo (−0.0017 no F1-macro), confirmando que o filtro Gaussiano
+não é determinante para o desempenho médio do modelo. A análise por classe, porém,
+revela comportamentos opostos dependendo da natureza de cada falha.
+
+**F1 por classe:**
+
+| Classe | Nome | Gaussiano | Sem Filtro | Delta |
+|---|---|---|---|---|
+| 0 | Normal | 0.9145 | 0.9091 | −0.005 |
+| 1 | BSW (Ativo) | 0.9389 | **0.9407** | +0.002 |
+| 2 | DHSV (Ativo) | 0.9729 | **0.9733** | +0.000 |
+| 3 | Golfadas (Ativo) | 0.9674 | **0.9757** | **+0.008** |
+| 4 | Inst. Fluxo (Ativo) | 0.8988 | **0.9063** | +0.007 |
+| 5 | Prod. Rápida (Ativo) | 0.9819 | **0.9853** | +0.003 |
+| 6 | PCK Restrição (Ativo) | 0.9901 | **0.9917** | +0.002 |
+| 7 | PCK Incrustação (Ativo) | **0.5712** | 0.5260 | **−0.045** |
+| 8 | Hidrato Produção (Ativo) | 0.8497 | **0.8508** | +0.001 |
+| 9 | Hidrato Serviço (Ativo) | 0.9895 | **0.9899** | +0.000 |
+| 101 | BSW (Trans.) | **0.9289** | 0.9281 | −0.001 |
+| 102 | DHSV (Trans.) | 0.8285 | **0.8646** | **+0.036** |
+| 105 | Prod. Rápida (Trans.) | 0.8899 | **0.8955** | +0.006 |
+| 106 | PCK Restrição (Trans.) | 0.9775 | **0.9794** | +0.002 |
+| 107 | PCK Incrustação (Trans.) | 0.9047 | 0.9074 | +0.003 |
+| 108 | Hidrato Produção (Trans.) | **0.8724** | 0.8278 | **−0.045** |
+| 109 | Hidrato Serviço (Trans.) | **0.9628** | 0.9586 | −0.004 |
+
+### 13.4 Análise por Tipo de Falha
+
+Os resultados revelam um padrão físico claro: o impacto do filtro depende da
+**dinâmica temporal** da falha.
+
+**Falhas de dinâmica rápida — sem filtro é melhor:**
+
+- **Classe 102 — DHSV Transiente (+0.036):** O fechamento espúrio da válvula DHSV
+  produz uma queda abrupta de pressão em poucos segundos. O filtro Gaussiano atenua
+  essa transição rápida, reduzindo as features `diff1_std` e `diff2_std` que capturam
+  justamente essa taxa de variação. Sem filtro, essas features retêm o sinal completo
+  da transição, tornando a classe mais fácil de distinguir.
+
+- **Classe 3 — Golfadas Severas (+0.008):** O padrão de golfadas consiste em picos
+  periódicos de pressão. O sensor QGL (vazão de gás lift) mostrou visualmente a maior
+  diferença entre os filtros — o filtro Gaussiano reduz a amplitude dos picos, enquanto
+  sem filtro `max_zscore` e `std` capturam os picos com maior fidelidade.
+
+- **Classe 4 — Instabilidade de Fluxo (+0.007):** Similar às golfadas, a instabilidade
+  gera oscilações que o filtro parcialmente suaviza.
+
+**Falhas de dinâmica lenta — filtro Gaussiano é melhor:**
+
+- **Classe 7 — PCK Incrustação (−0.045):** A incrustação no choke de produção é um
+  processo gradual que ocorre ao longo de horas ou dias. O modelo precisa detectar uma
+  tendência sutil de aumento de restrição. Sem filtro, o ruído de alta frequência do
+  sensor (visível em P-ANULAR no gráfico de comparação) eleva artificialmente `std` e
+  `diff1_std`, mascarando a tendência lenta. O filtro Gaussiano remove esse ruído e
+  torna a tendência mais visível para o modelo.
+
+- **Classe 108 — Hidrato Produção Transiente (−0.045):** O transiente de hidrato é
+  caracterizado por uma queda gradual de temperatura (efeito Joule-Thomson no choke)
+  e aumento progressivo de pressão diferencial — dinâmica de horas. O ruído nos
+  sensores P-ANULAR e P-MON-CKP, sem filtro, introduz variabilidade espúria nas
+  features que confunde o modelo durante essa fase de acúmulo lento.
+
+**Sensores mais afetados pela escolha do filtro:**
+
+Com base na comparação visual dos filtros realizada na instância WELL-00028
+(Classe 8 — Hidrato na Linha de Produção):
+
+| Sensor | Comportamento sem filtro | Impacto nas features |
+|---|---|---|
+| QGL | Alta variabilidade preservada | `std`, `max_zscore` maiores — beneficia classes com oscilações rápidas |
+| P-ANULAR | Picos periódicos preservados | `max_zscore`, `iqr` maiores — pode ser ruído ou sinal real |
+| T-MON-CKP | Sinal suave — sem diferença | Nenhum impacto prático |
+| P-JUS-CKGL | Sinal suave — sem diferença | Nenhum impacto prático |
+
+### 13.5 Análise SHAP — Mudança de Importância entre Modelos
+
+Os gráficos SHAP gerados para cada classe (salvos em `results/figures/shap/nofilter/`)
+revelam duas padrões principais:
+
+**Classes onde o filtro não importa** (DHSV Ativo, Hidrato Serviço, PCK Restrição):
+Os bee swarm plots do modelo Gaussiano e do modelo Sem Filtro são praticamente
+idênticos — as mesmas features dominam, com magnitudes similares. Isso ocorre porque
+esses eventos são detectáveis por tendências de larga escala que ambos os
+pré-processamentos preservam igualmente.
+
+**Classes onde o filtro muda as features dominantes** (DHSV Transiente, Golfadas,
+PCK Incrustação): Os SHAP values mostram redistribuição de importância entre features
+de `diff1_std`/`diff2_std` (derivadas, sensíveis ao ruído) e `mean`/`std` (tendência
+global). Sem filtro, as features de derivada ganham importância nas classes de dinâmica
+rápida (benefício) mas perdem discriminabilidade nas classes de dinâmica lenta (custo).
+
+### 13.6 Conclusão (Gaussiano vs Sem Filtro)
+
+O filtro Gaussiano com `sigma=2.0` é uma escolha robusta para o problema como um todo:
+minimiza a degradação global (apenas −0.0017 no F1-macro) enquanto protege especificamente
+as duas classes mais raras e de detecção mais difícil — PCK Incrustação (classe 7) e
+Hidrato Produção Transiente (classe 108) — onde a perda sem filtro é de −0.045 em ambas.
+
+Para um sistema de monitoramento em tempo real, onde a detecção de hidratos e incrustações
+é crítica por razões de segurança e custo operacional, essa proteção justifica a escolha
+do filtro Gaussiano como padrão no pipeline.
 
 ---
 
-#### Classe 102 — DHSV Transiente (RF F1=0,786 | XGBoost F1=0,829)
+### 13.7 Filtro Estatístico Adaptativo (σ=0.5)
 
-A classe 102 representa o **período de transição** do fechamento da DHSV (Downhole Safety Valve — válvula de segurança de subsuperfície). Ao contrário da classe 7, ambos os modelos detectam essa classe, mas o desbalanceamento ainda limita o desempenho.
+Para completar o ablation study, foi testado um terceiro regime de pré-processamento: o
+**filtro estatístico adaptativo** (implementado em `_apply_statistical_filter`), parametrizado
+com `sigma=0.5` (threshold ≈ 1.41 z-score).
 
-**Natureza do desbalanceamento:** os transientes da DHSV são por definição breves — o fechamento completo da válvula ocorre em dezenas de segundos. Isso gera muito menos janelas rotuladas como classe 102 (transiente) do que como classe 2 (DHSV ativa). O modelo precisa aprender a distinguir o transiente do estado ativo com base em características dinâmicas da série temporal.
+O filtro opera de forma causal (forward pass) seguido de um backward pass para eliminar
+defasagem de fase, combinando o resultado via `filtfilt` adaptativo. O coeficiente de
+mistura `alpha` é calculado por:
 
-**Features mais importantes — RF:**
-- `T-JUS-CKP_max` (baixo → classe 102): quando a temperatura máxima a jusante do choke é **baixa**, o modelo sinaliza transiente — a válvula está começando a fechar e o fluxo está diminuindo
-- `T-TPT_iqr` e `T-TPT_std`: variabilidade elevada da temperatura no topo — o fechamento progressivo causa oscilações enquanto o fluxo desacelera
+```
+alpha = erf(|x_anterior - u| / (2√2 × sigma))
+saida = (1 - alpha) * x_anterior + alpha * u
+```
 
-**Features mais importantes — XGBoost:**
-- `P-TPT_iqr`: alta variabilidade da pressão no topo — durante o fechamento, ondas de pressão se propagam pela coluna
-- `T-TPT_diff1_std`: alto desvio padrão da taxa de variação da temperatura — a temperatura está mudando *rapidamente* e de forma *irregular*
-- `T-TPT_skewness`: assimetria da distribuição de temperatura na janela — quando a janela captura tanto o período pré-fechamento quanto o pós-restrição, a distribuição de temperatura se torna assimétrica
+Com `sigma=0.5`, o filtro suaviza variações pequenas (ruído típico com |diff| < 0.032 z-score)
+e preserva transientes grandes (|diff| > 1.41 z-score), diferentemente do Gaussiano, que
+suaviza independentemente da magnitude da variação.
 
-**Interpretação física:** o transiente é um estado inerentemente dinâmico. As features que o distinguem do estado ativo completo (classe 2) não são os valores absolutos dos sensores, mas sim a *taxa de mudança* e a *forma da distribuição temporal* dentro da janela de 300 s. Por isso, features derivadas (`diff1_std`, `diff2_std`) e de forma (`skewness`, `iqr`) superam features estáticas (`mean`, `max`) para essa classe — e o XGBoost, que constrói árvores mais profundas e focadas em gradientes, captura essas nuances melhor que o RF.
+**Melhores hiperparâmetros encontrados (filtro estatístico):**
+`n_estimators=500, max_depth=4, learning_rate=0.1, subsample=0.8,
+colsample_bytree=1.0, min_child_weight=3`
 
-### 12.7 Interpretação Física — Classe 8: Hidrato na Linha de Produção
-
-A classe 8 é uma das mais bem classificadas por ambos os modelos (RF F1=0,855 | XGBoost F1=0,850), e a análise SHAP revela que os critérios aprendidos têm forte respaldo na termodinâmica de formação de hidratos.
-
-#### Condições físicas de formação de hidratos
-
-Hidratos de gás são compostos cristalinos que se formam quando **moléculas de gás (CH₄, C₂H₆, CO₂) ficam aprisionadas em gaiolas de moléculas de água** sob condições específicas de pressão e temperatura. A curva de equilíbrio hidrato separa as regiões de estabilidade:
-
-- **Alta pressão + baixa temperatura** → região de formação de hidratos
-- Em linhas de produção subseas: temperatura da água do mar no fundo pode ser 2–4°C, e a pressão hidrostática é elevada — condições propícias
-- O ponto mais crítico é **a jusante da válvula choke (CKP)**: o efeito Joule-Thomson (expansão brusca do gás ao passar pelo orifício da válvula) resfria adicionalmente o fluido, podendo cruzar a curva de equilíbrio
-
-#### Features aprendidas pelo XGBoost e respaldo físico
-
-| Feature | SHAP | Interpretação física | Respaldo termodinâmico |
-|---------|------|----------------------|------------------------|
-| `T-JUS-CKP_min` | Baixo → classe 8 | Temperatura mínima a jusante do choke muito baixa | **Diretamente**: temperatura abaixo da curva de equilíbrio na zona mais fria da linha ✓ |
-| `P-MON-CKP_max` | Alto → classe 8 | Pressão máxima no manifold elevada | **Alta pressão** é pré-condição para formação de hidratos ✓ |
-| `P-TPT_iqr` | Alto → classe 8 | Alta variabilidade de pressão no topo | Tampão de hidrato causa bloqueio intermitente → pulsos de pressão ✓ |
-| `P-PDG_mean` | Alto → classe 8 | Pressão média elevada no fundo do poço | Alta pressão de reservatório sustenta condições de formação ✓ |
-| `T-TPT_mean` | Baixo → classe 8 | Temperatura média no topo abaixo do normal | Temperatura no topo dentro da janela de estabilidade de hidratos ✓ |
-| `P-TPT_min` | Baixo → classe 8 | Queda de pressão mínima no topo | Reflexo da restrição a montante do tampão de hidrato ✓ |
-
-#### Síntese da interpretação
-
-O XGBoost aprendeu, sem supervisão física explícita, os dois vetores fundamentais que definem a formação de hidratos:
-
-1. **Temperatura baixa a jusante do choke** (`T-JUS-CKP_min` baixo): o efeito Joule-Thomson cruza a curva de equilíbrio — a termodinâmica favorece a formação de hidratos exatamente nesse ponto da linha de produção.
-
-2. **Alta pressão combinada com sinais de restrição de fluxo** (`P-MON-CKP_max` alto + `P-TPT_iqr` alto + `P-TPT_min` baixo): o hidrato em formação age como uma restrição progressiva — pressão acumula a montante enquanto oscilações de pressão no topo indicam o bloqueio intermitente característico do crescimento do tampão.
-
-O acordo entre RF e XGBoost (F1=0,855 vs 0,850) e o alinhamento das features com a teoria termodinâmica constituem **validação cruzada independente**: o modelo aprendeu os mecanismos físicos reais, não padrões espúrios dos dados.
+(idênticos ao XGBoost Gaussiano — confirma que a busca de hiperparâmetros converge para
+a mesma configuração independentemente do pré-processamento)
 
 ---
 
-## 13. Artefatos Gerados
+### 13.8 Comparação Tripla — Gaussiano vs Sem Filtro vs Estatístico
+
+**Métricas globais:**
+
+| Métrica | Gaussiano | Sem Filtro | Estatístico | Melhor |
+|---|:---:|:---:|:---:|:---:|
+| F1-macro | **0.9082** | 0.9065 | 0.9067 | Gaussiano |
+| F1-weighted | 0.9361 | 0.9339 | **0.9401** | **Estatístico** |
+| Accuracy | 0.9364 | 0.9345 | **0.9402** | **Estatístico** |
+
+O filtro estatístico supera ambos os outros em F1-weighted e Accuracy — indicando que
+é mais preciso para as classes frequentes (que dominam essas métricas). No F1-macro
+(que trata todas as classes igualmente), o Gaussiano permanece ligeiramente superior.
+
+**F1 por classe — comparação tripla:**
+
+| Cl. | Estado | Gauss. | S/Filt. | Estat. | Estat.−Gauss. | Estat.−S/Filt. |
+|:---:|--------|:------:|:-------:|:------:|:-------------:|:--------------:|
+| 0 | Normal | 0.9145 | 0.9091 | **0.9168** | +0.002 | +0.008 |
+| 1 | BSW (Ativo) | 0.9389 | **0.9407** | 0.9403 | +0.001 | −0.000 |
+| 2 | DHSV (Ativo) | **0.9729** | 0.9733 | 0.9648 | −0.008 | −0.009 |
+| 3 | Golfadas (Ativo) | 0.9674 | **0.9757** | 0.9588 | −0.009 | −0.017 |
+| 4 | Inst. Fluxo (Ativo) | 0.8988 | **0.9063** | 0.8894 | −0.009 | −0.017 |
+| 5 | Prod. Rápida (Ativo) | **0.9819** | 0.9853 | 0.9804 | −0.002 | −0.005 |
+| 6 | PCK Restrição (Ativo) | 0.9901 | **0.9917** | 0.9911 | +0.001 | −0.001 |
+| **7** | **PCK Incrust. (Ativo)** | 0.5712 | 0.5260 | **0.5761** | **+0.005** | **+0.050** |
+| 8 | Hidrato Prod. (Ativo) | **0.8497** | 0.8508 | 0.8443 | −0.005 | −0.007 |
+| 9 | Hidrato Serv. (Ativo) | **0.9895** | 0.9899 | 0.9879 | −0.002 | −0.002 |
+| 101 | BSW (Trans.) | 0.9289 | 0.9281 | **0.9544** | **+0.026** | **+0.026** |
+| **102** | **DHSV (Trans.)** | 0.8285 | **0.8646** | 0.7718 | **−0.057** | **−0.093** |
+| 105 | Prod. Rápida (Trans.) | **0.8899** | 0.8955 | 0.8869 | −0.003 | −0.009 |
+| 106 | PCK Restrição (Trans.) | 0.9775 | **0.9794** | 0.9786 | +0.001 | −0.001 |
+| 107 | PCK Incrust. (Trans.) | 0.9047 | 0.9074 | **0.9210** | **+0.016** | **+0.014** |
+| **108** | **Hidrato Prod. (Trans.)** | 0.8724 | 0.8278 | **0.8914** | **+0.019** | **+0.064** |
+| 109 | Hidrato Serv. (Trans.) | **0.9628** | 0.9586 | 0.9605 | −0.002 | +0.002 |
+
+**Padrão observado:**
+
+O filtro estatístico apresenta comportamento misto que reflete seu mecanismo adaptativo:
+
+- **Ganhos significativos:** classes 101 (+0.026), 107 (+0.016), 108 (+0.019) e classe 7 (+0.005) — transientes lentos e classes de detecção difícil se beneficiam da suavização adaptativa, que remove ruído sem atenuar tendências de larga escala.
+
+- **Perda crítica — Classe 102 DHSV Transiente (−0.057 vs Gaussiano, −0.093 vs Sem Filtro):** O fechamento abrupto da válvula DHSV produz uma variação de pressão que, após z-scoring, frequentemente ultrapassa o threshold de 1.41 z-score — e portanto o filtro estatístico **preserva** esse transiente. Contudo, os resultados indicam que o mecanismo backward pass introduz um efeito de antecipação artificial (suavização "futura" retroativa) que confunde as features de derivada (`diff1_std`) para esse tipo específico de evento.
+
+- **Classes de dinâmica rápida (3, 4):** O filtro estatístico é ligeiramente inferior ao sem-filtro porque o sigma=0.5 ainda suaviza variações no limiar do threshold.
+
+**Figuras geradas:** `results/figures/shap/statistical_vs_nofilter/shap_classe{C}.png` (17 figuras)
+e `shap_delta_f1_statistical_vs_nofilter.png` (resumo do delta F1 por classe).
+
+---
+
+### 13.9 Conclusão Final do Estudo Comparativo
+
+| Filtro | F1-macro | F1-weighted | Melhor para |
+|--------|:--------:|:-----------:|------------|
+| Gaussiano (`sigma=2.0`) | **0.9082** | 0.9361 | Classes raras de detecção difícil (7, 108); consistência global |
+| Sem Filtro | 0.9065 | 0.9339 | Falhas de dinâmica rápida (102 DHSV Trans., 3 Golfadas) |
+| **Estatístico** (`sigma=0.5`) | 0.9067 | **0.9401** | F1-weighted e Accuracy; classes 101, 107, 108 |
+
+Nenhum filtro domina em todas as classes simultaneamente — cada regime favorece um
+subconjunto de falhas com características temporais distintas. Para o objetivo principal
+do TCC (maximizar F1-macro com ênfase em classes raras), o **filtro Gaussiano permanece
+a escolha padrão** por sua consistência. O filtro estatístico representa uma alternativa
+viável quando se prioriza precisão nas classes frequentes (F1-weighted).
+
+---
+
+## 14. Artefatos Gerados
 
 | Arquivo | Conteúdo |
 |---------|---------|
@@ -705,3 +879,16 @@ O acordo entre RF e XGBoost (F1=0,855 vs 0,850) e o alinhamento das features com
 | `results/metrics/xgboost_window_class_metrics.json` | Métricas detalhadas — XGBoost abordagem 2 |
 | `results/metrics/rf_nested_cv_results.json` | Resultados do Nested CV — RF abordagem 2 |
 | `results/figures/confusion_matrix_xgboost_estado_operacional.png` | Matriz de confusão — XGBoost abordagem 2 |
+| `data/processed/features_nofilter_window_class.parquet` | Features sem filtro — ablation study |
+| `results/models/xgboost_nofilter_window_class.joblib` | XGBoost treinado sem filtro |
+| `results/models/imputer_nofilter_window_class.joblib` | Imputador de NaN — XGBoost sem filtro |
+| `results/metrics/xgboost_nofilter_metrics.json` | Métricas detalhadas — XGBoost sem filtro |
+| `results/figures/shap/nofilter/shap_nofilter_classeXXX.png` | SHAP por classe — Gaussiano vs Sem Filtro (17 figuras) |
+| `data/processed/features_statistical_window_class.parquet` | Features com filtro estatístico (σ=0.5) — ablation study |
+| `results/models/xgboost_statistical_window_class.joblib` | XGBoost treinado com filtro estatístico |
+| `results/models/imputer_statistical_window_class.joblib` | Imputador de NaN — XGBoost filtro estatístico |
+| `results/metrics/xgboost_statistical_metrics.json` | Métricas detalhadas — XGBoost filtro estatístico |
+| `results/figures/shap/statistical_vs_nofilter/shap_classeXXX.png` | SHAP comparativo — Estatístico vs Sem Filtro (17 figuras) |
+| `results/figures/shap/statistical_vs_nofilter/shap_delta_f1_statistical_vs_nofilter.png` | Delta F1 por classe — Estatístico vs Sem Filtro |
+| `results/metrics/cnn1d_metrics.json` | Métricas detalhadas — CNN-1D (FCN), 5 folds OOF |
+| `results/figures/confusion_matrix/confusion_matrix_cnn1d_estado_operacional.png` | Matriz de confusão — CNN-1D |

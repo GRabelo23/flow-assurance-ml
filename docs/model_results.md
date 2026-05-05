@@ -6,60 +6,46 @@
 
 ---
 
-## Abordagem 1 — Diagnóstico por Instância (10 classes)
-
-Cada janela herda a `fault_class` do poço inteiro. Responde: "qual tipo de falha ocorreu nesse poço?"
-
-| Modelo | F1-macro (CV) | F1-weighted | Accuracy | Data |
-|--------|:-------------:|:-----------:|:--------:|------|
-| Random Forest | **0.9558** | 0.9577 | 0.9579 | 2026-04-26 19:01 |
-| XGBoost | — | — | — | — |
-| MLP | — | — | — | — |
-
-### Matriz de Confusão — Random Forest Diagnóstico
-
-<img src="../figures/confusion_matrix_random_forest.png" width="600"/>
-
----
-
-## Abordagem 2 — Estado Operacional por Janela (17 classes)
+## Estado Operacional por Janela (17 classes)
 
 Cada janela recebe a moda da coluna `class` dentro dela. Responde: "qual é o estado do poço agora?"
 Classes: 0=Normal, 1–9=Evento Ativo, 101–109=Transiente (103 e 104 ausentes no dataset).
 
-| Modelo | F1-macro (CV) | F1-weighted | Accuracy | Data |
-|--------|:-------------:|:-----------:|:--------:|------|
-| RF Estado Operacional | 0.8827 | 0.9308 | 0.9322 | 2026-04-27 04:25 |
-| **XGBoost Estado Operacional** | **0.8866** | **0.9361** | **0.9364** | 2026-04-27 13:02 |
-| MLP Estado Operacional | — | — | — | — |
+| Modelo | Filtro | F1-macro | F1-weighted | Accuracy | Data |
+|--------|--------|:--------:|:-----------:|:--------:|------|
+| RF Estado Operacional | Gaussiano | 0.8716 | 0.9308 | 0.9322 | 2026-04-27 04:25 |
+| XGBoost Estado Operacional | Gaussiano | **0.9082** | 0.9361 | 0.9364 | 2026-04-27 13:02 |
+| XGBoost Estado Operacional | Sem Filtro | 0.9065 | 0.9339 | 0.9345 | 2026-04-29 |
+| **XGBoost Estado Operacional** | **Estatístico** | 0.9067 | **0.9401** | **0.9402** | 2026-04-29 |
+| CNN-1D (FCN) | Gaussiano | 0.6685 | 0.7168 | 0.7107 | 2026-05-04 |
 
-### Matrizes de Confusão — Abordagem 2
+### Matrizes de Confusão 
 
 **Random Forest:**
 
-<img src="../figures/confusion_matrix_rf_estado_operacional.png" width="900"/>
+<img src="../results/figures/confusion_matrix/confusion_matrix_rf_estado_operacional.png" width="900"/>
 
 **XGBoost:**
 
-<img src="../figures/confusion_matrix_xgboost_estado_operacional.png" width="900"/>
+<img src="../results/figures/confusion_matrix/confusion_matrix_xgboost_estado_operacional.png" width="900"/>
 
 ---
 
 ## Contexto dos Datasets
 
-| Item | Abordagem 1 | Abordagem 2 |
-|------|------------|------------|
-| Arquivo | `features.parquet` | `features_window_class.parquet` |
-| Instâncias (poços) | 1.409 | 1.409 |
-| Janelas totais | 471.477 | 449.397 |
-| Features por janela | 88 | 88 |
-| Classes | 10 | 17 |
-| Janela | 300 s, passo 150 s | 300 s, passo 150 s |
-| Normalização | Z-score por instância | Z-score por instância |
+| Item | Resultado |
+|------|------------|
+| Arquivo | `features_window_class.parquet` |
+| Instâncias (poços) | 1.409 |
+| Janelas totais | 449.397 |
+| Features por janela | 88 |
+| Classes | 17 |
+| Janela | 300 s, passo 150 s |
+| Normalização | Z-score por instância |
 
 ---
 
-## Detalhe: Random Forest — Diagnóstico (10 classes)
+## Random Forest — Diagnóstico (10 classes)
 
 **Arquivo:** `results/models/random_forest.joblib` | **Data:** 2026-04-26 19:01:32
 
@@ -101,7 +87,7 @@ Classes: 0=Normal, 1–9=Evento Ativo, 101–109=Transiente (103 e 104 ausentes 
 
 ---
 
-## Detalhe: Random Forest — Estado Operacional (17 classes)
+## Random Forest — Estado Operacional (17 classes)
 
 **Arquivo:** `results/models/rf_window_class.joblib` | **Data:** 2026-04-27 04:25:09
 
@@ -150,7 +136,7 @@ Classes: 0=Normal, 1–9=Evento Ativo, 101–109=Transiente (103 e 104 ausentes 
 
 ---
 
-## Detalhe: XGBoost — Estado Operacional (17 classes)
+## XGBoost — Estado Operacional (17 classes)
 
 **Arquivo:** `results/models/xgboost_window_class.joblib` | **Data:** 2026-04-27 13:02:37
 
@@ -202,7 +188,7 @@ Classes: 0=Normal, 1–9=Evento Ativo, 101–109=Transiente (103 e 104 ausentes 
 
 ---
 
-## Validação: Nested CV vs Flat CV — Random Forest (Abordagem 2)
+## Validação: Nested CV vs Flat CV — Random Forest 
 
 **Objetivo:** Quantificar o viés introduzido pela seleção de hiperparâmetros no flat CV.
 **Configuração:** Outer GroupKFold(5) · Inner GroupKFold(3) · N\_ITER=20 · mesmo grid que o flat CV
@@ -258,12 +244,157 @@ O flat CV superestima o desempenho real em **0,95%** de F1-macro — dentro do i
 
 ---
 
-## XGBoost — Diagnóstico (10 classes)
+---
 
-**Status:** A treinar | **Arquivo:** `results/models/xgboost.joblib`
+## Impacto da Filtragem de Sinal (XGBoost, Abordagem 2)
+
+Mesmo modelo, mesma busca de hiperparâmetros, mesmo GroupKFold. Apenas o pré-processamento varia.
+
+### Métricas globais
+
+| Filtro | F1-macro | F1-weighted | Accuracy | CV best F1 |
+|--------|:--------:|:-----------:|:--------:|:----------:|
+| Gaussiano (`sigma=2.0`) | **0.9082** | 0.9361 | 0.9364 | 0.8866 |
+| Sem Filtro | 0.9065 | 0.9339 | 0.9345 | 0.8890 |
+| **Estatístico** (`sigma=0.5`) | 0.9067 | **0.9401** | **0.9402** | 0.8854 |
+
+### F1 por classe — três filtros
+
+| Cl. | Estado | Gauss. | S/Filt. | Estat. | Melhor |
+|:---:|--------|:------:|:-------:|:------:|:------:|
+| 0 | Normal | 0.9145 | 0.9091 | **0.9168** | Estat. |
+| 1 | BSW (Ativo) | 0.9389 | **0.9407** | 0.9403 | S/Filt. |
+| 2 | DHSV (Ativo) | **0.9729** | 0.9733 | 0.9648 | Gauss. |
+| 3 | Golfadas (Ativo) | 0.9674 | **0.9757** | 0.9588 | S/Filt. |
+| 4 | Inst. Fluxo (Ativo) | 0.8988 | **0.9063** | 0.8894 | S/Filt. |
+| 5 | Prod. Rápida (Ativo) | **0.9819** | 0.9853 | 0.9804 | Gauss. |
+| 6 | PCK Restrição (Ativo) | 0.9901 | **0.9917** | 0.9911 | S/Filt. |
+| **7** | **PCK Incrust. (Ativo)** | 0.5712 | 0.5260 | **0.5761** | **Estat.** |
+| 8 | Hidrato Prod. (Ativo) | **0.8497** | 0.8508 | 0.8443 | Gauss. |
+| 9 | Hidrato Serv. (Ativo) | **0.9895** | 0.9899 | 0.9879 | Gauss. |
+| 101 | BSW (Trans.) | 0.9289 | 0.9281 | **0.9544** | **Estat.** |
+| **102** | **DHSV (Trans.)** | 0.8285 | **0.8646** | 0.7718 | **S/Filt.** |
+| 105 | Prod. Rápida (Trans.) | 0.8899 | **0.8955** | 0.8869 | S/Filt. |
+| 106 | PCK Restrição (Trans.) | 0.9775 | **0.9794** | 0.9786 | S/Filt. |
+| 107 | PCK Incrust. (Trans.) | 0.9047 | 0.9074 | **0.9210** | **Estat.** |
+| **108** | **Hidrato Prod. (Trans.)** | 0.8724 | 0.8278 | **0.8914** | **Estat.** |
+| 109 | Hidrato Serv. (Trans.) | **0.9628** | 0.9586 | 0.9605 | Gauss. |
+
+### Contagem de "melhores" por filtro
+
+| Filtro | Classes onde é melhor |
+|--------|-----------------------|
+| Gaussiano | 6 (DHSV At., Prod. Rápida At., Hidrato Prod. At., Hidrato Serv. At., Prod. Rápida Tr., Hidrato Serv. Tr.) |
+| Sem Filtro | 6 (BSW At., Golfadas, Inst. Fluxo, PCK Restr. At., **DHSV Trans.**, Prod. Rápida Tr., PCK Restr. Tr.) |
+| Estatístico | 5 (Normal, **PCK Incrust. Ativo**, **BSW Trans.**, **PCK Incrust. Trans.**, **Hidrato Prod. Trans.**) |
+
+### Interpretação
+
+- **Gaussiano** protege classes de dinâmica lenta e processos graduais
+- **Sem filtro** favorece transientes rápidos (DHSV, Golfadas, Instabilidade)
+- **Estatístico** é o melhor nos transientes semi-lentos e classes raras críticas (107, 108), mas perde em DHSV (transiente muito abrupto onde o backward pass introduz artefatos)
 
 ---
 
-## MLP — Diagnóstico (10 classes) e Estado Operacional
+## XGBoost — Estado Operacional com Filtro Estatístico (σ=0.5)
 
-**Status:** A treinar
+**Arquivo:** `results/models/xgboost_statistical_window_class.joblib` | **Data:** 2026-04-29
+
+### Melhores Hiperparâmetros
+| Parâmetro | Valor |
+|-----------|-------|
+| n_estimators | 500 |
+| max_depth | 4 |
+| learning_rate | 0.1 |
+| subsample | 0.8 |
+| colsample_bytree | 1.0 |
+| min_child_weight | 3 |
+
+(idênticos ao XGBoost Gaussiano — a busca converge para a mesma configuração independente do filtro)
+
+### Métricas
+
+| Métrica | Gaussiano | Sem Filtro | **Estatístico** |
+|---------|:---------:|:----------:|:---------------:|
+| F1-macro | **0.9082** | 0.9065 | 0.9067 |
+| F1-weighted | 0.9361 | 0.9339 | **0.9401** |
+| Accuracy | 0.9364 | 0.9345 | **0.9402** |
+
+### Por Classe
+| Classe | Estado | Precision | Recall | F1 | Suporte |
+|--------|--------|:---------:|:------:|:--:|--------:|
+| 0 | Normal | 0.9002 | 0.9340 | 0.9168 | 102.040 |
+| 1 | BSW (Ativo) | 0.9341 | 0.9465 | 0.9403 | 19.305 |
+| 2 | DHSV (Ativo) | 0.9694 | 0.9601 | 0.9648 | 2.409 |
+| 3 | Golfadas (Ativo) | 0.9594 | 0.9582 | 0.9588 | 32.105 |
+| 4 | Inst. Fluxo (Ativo) | 0.8377 | 0.9478 | 0.8894 | 12.238 |
+| 5 | Prod. Rápida (Ativo) | 0.9844 | 0.9764 | 0.9804 | 70.018 |
+| 6 | PCK Restrição (Ativo) | 0.9932 | 0.9890 | 0.9911 | 25.645 |
+| **7** | **PCK Incrust. (Ativo)** | 0.6696 | 0.5055 | **0.5761** | 914 |
+| 8 | Hidrato Prod. (Ativo) | 0.8519 | 0.8368 | 0.8443 | 4.817 |
+| 9 | Hidrato Serv. (Ativo) | 0.9844 | 0.9915 | 0.9879 | 21.122 |
+| 101 | BSW (Trans.) | 0.9602 | 0.9486 | 0.9544 | 34.991 |
+| 102 | DHSV (Trans.) | 0.8108 | 0.7364 | 0.7718 | 937 |
+| 105 | Prod. Rápida (Trans.) | 0.9047 | 0.8698 | 0.8869 | 16.045 |
+| 106 | PCK Restrição (Trans.) | 0.9762 | 0.9810 | 0.9786 | 10.181 |
+| 107 | PCK Incrust. (Trans.) | 0.9256 | 0.9164 | **0.9210** | 48.982 |
+| **108** | **Hidrato Prod. (Trans.)** | 0.9390 | 0.8484 | **0.8914** | 27.934 |
+| 109 | Hidrato Serv. (Trans.) | 0.9741 | 0.9473 | 0.9605 | 19.714 |
+
+### Observações
+- Melhor F1-weighted (0.9401) e Accuracy (0.9402) de todos os três filtros
+- Maior ganho vs Gaussiano: Classe 101 BSW Trans. (+0.026) e Classe 108 Hidrato Prod. Trans. (+0.019)
+- Pior resultado vs ambos: Classe 102 DHSV Trans. (0.7718) — efeito do backward pass em transientes ultra-rápidos
+- Classe 7 PCK Incrustação Ativa: 0.5761 — melhor entre os três filtros
+
+---
+
+## CNN-1D (FCN) — Estado Operacional (17 classes)
+
+**Script:** `scripts/train_cnn1d_v3.py` | **Data:** 2026-05-04
+**Arquitetura:** FCN — Wang et al. (2017): Conv1D(128,8) → Conv1D(256,5) → Conv1D(128,3) → GlobalAveragePooling → Dense(19)
+**Validação:** GroupKFold(5) por instance_id, val=15% das instâncias de treino, EarlyStopping(monitor=val_f1_macro, patience=15)
+
+### Métricas Globais
+| Métrica | Valor |
+|---------|-------|
+| F1-macro | 0.6685 |
+| F1-weighted | 0.7168 |
+| Accuracy | 0.7107 |
+| F1 por fold | [0.6601, 0.6681, 0.6725, 0.6657, 0.6753] |
+| Desvio entre folds | ±0.0048 (muito estável) |
+
+### Por Classe
+| Classe | Estado | F1 CNN | F1 XGB | Δ |
+|--------|--------|:------:|:------:|:-:|
+| 0 | Normal | 0.6116 | 0.9145 | −0.303 |
+| 1 | BSW (Ativo) | 0.6692 | 0.9389 | −0.270 |
+| 2 | DHSV (Ativo) | **0.8961** | 0.9729 | −0.077 |
+| 3 | Golfadas (Ativo) | **0.9170** | 0.9674 | −0.050 |
+| 4 | Inst. Fluxo (Ativo) | 0.4727 | 0.8988 | −0.426 |
+| 5 | Prod. Rápida (Ativo) | **0.8881** | 0.9819 | −0.094 |
+| 6 | PCK Restr. (Ativo) | 0.6924 | 0.9901 | −0.298 |
+| **7** | **PCK Incrust. (Ativo)** | 0.1816 | **0.5712** | **−0.390** |
+| 8 | Hidrato Prod. (Ativo) | 0.7944 | 0.8497 | −0.055 |
+| 9 | Hidrato Serv. (Ativo) | **0.9404** | 0.9895 | −0.049 |
+| 101 | BSW (Trans.) | 0.6848 | 0.9289 | −0.244 |
+| 102 | DHSV (Trans.) | 0.3853 | 0.8285 | −0.443 |
+| 103 | Golfadas (Trans.) | 0.0000 | — | — |
+| 104 | Inst. Fluxo (Trans.) | 0.0000 | — | — |
+| 105 | Prod. Rápida (Trans.) | 0.5929 | 0.8899 | −0.297 |
+| 106 | PCK Restr. (Trans.) | 0.4515 | 0.9775 | −0.526 |
+| 107 | PCK Incrust. (Trans.) | 0.6071 | 0.9047 | −0.298 |
+| 108 | Hidrato Prod. (Trans.) | 0.7638 | 0.8724 | −0.109 |
+| 109 | Hidrato Serv. (Trans.) | 0.8165 | 0.9628 | −0.146 |
+
+### Matriz de Confusão - CNN1D 
+
+<img src="../results/figures/confusion_matrix/confusion_matrix_cnn1d_estado_operacional.png" width="900"/>
+
+### Observações
+- **Melhor desempenho CNN:** classes de eventos ativos bem definidos — Golfadas (0.917), Hidrato Serv. (0.940), DHSV (0.896), Prod. Rápida (0.888)
+- **Pior desempenho CNN:** transientes (102=0.385) — sem features artesanais de derivada, a CNN não distingue bem transientes de estados ativos
+- **Classe 7:** CNN F1=0.182 vs XGBoost 0.571 — boosting sequencial é superior para classes extremamente raras
+- **Gap médio CNN vs XGBoost:** −0.240 p.p. em F1-macro (0.6685 vs 0.9082)
+- **Desvio entre folds ±0.005** — treinamento estável, resultado reproduzível
+

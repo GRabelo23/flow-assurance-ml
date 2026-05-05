@@ -10,3 +10,5 @@ joblib>=1.3
 jupyter>=1.0
 imbalanced-learn>=0.11
 scipy>=1.11
+# CNN-1D: no WSL2/Linux usar "pip install tensorflow[and-cuda]" em vez desta linha
+tensorflow>=2.13

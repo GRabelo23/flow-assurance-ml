@@ -14,6 +14,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from scipy.ndimage import gaussian_filter1d
+from scipy.special import erf
 from scipy.stats import kurtosis, skew
 
 import sys
@@ -29,6 +30,7 @@ from config import (
     MAX_MISSING_RATIO,
     N_INSTANCES_VALIDATION,
     RAW_DATA_DIR,
+    STATISTICAL_SIGMA,
     STEP_SIZE,
     VALIDATION_MODE,
     WINDOW_SIZE,
@@ -45,6 +47,54 @@ def _apply_gaussian_filter(series: np.ndarray, sigma: float = GAUSSIAN_SIGMA) ->
         return series
     smoothed = series.copy()
     smoothed[~mask] = gaussian_filter1d(series[~mask], sigma=sigma)
+    return smoothed
+
+
+def _apply_statistical_filter(series: np.ndarray, sigma: float = STATISTICAL_SIGMA) -> np.ndarray:
+    """Filtro estatístico adaptativo (forward + backward), preservando NaN como NaN.
+
+    Diferente do filtro Gaussiano fixo, este filtro adapta o grau de suavização
+    ao conteúdo do sinal a cada passo:
+    - Mudanças pequenas (< sigma) → alpha ≈ 0 → suaviza (trata como ruído)
+    - Mudanças grandes (>> sigma) → alpha → 1 → segue o sinal (trata como evento real)
+
+    alpha = erf(|x_anterior - u| / (sqrt(2) * 2 * sigma))
+    saída = (1 - alpha) * x_anterior  +  alpha * u
+
+    Aplica o filtro duas vezes (frente→trás e trás→frente) para eliminar o
+    atraso de fase introduzido pelo processamento causal — equivalente ao
+    `filtfilt` do scipy para filtros lineares.
+
+    Parâmetros
+    ----------
+    series : np.ndarray
+        Série temporal de um único sensor (pode conter NaN).
+    sigma : float
+        Erro típico de medição em unidades z-score. Controla o limiar entre
+        ruído e evento: mudanças menores que ~2*sigma são suavizadas.
+        Default: STATISTICAL_SIGMA (0.5 — conservador para dados z-scored).
+    """
+    mask = np.isnan(series)
+    if mask.all():
+        return series
+
+    valid = series[~mask].copy()
+    denom = np.sqrt(2.0) * 2.0 * sigma
+
+    def _pass(x: np.ndarray) -> np.ndarray:
+        out = np.empty_like(x)
+        out[0] = x[0]
+        for i in range(1, len(x)):
+            alpha = min(float(erf(abs(out[i - 1] - x[i]) / denom)), 1.0)
+            out[i] = (1.0 - alpha) * out[i - 1] + alpha * x[i]
+        return out
+
+    # forward pass → backward pass (cancela o atraso de fase)
+    forward  = _pass(valid)
+    backward = _pass(forward[::-1])[::-1]
+
+    smoothed = series.copy()
+    smoothed[~mask] = backward
     return smoothed
 
 
@@ -152,7 +202,8 @@ def extract_features_from_instance(df_instance: pd.DataFrame,
                                     window_size: int = WINDOW_SIZE,
                                     step_size: int = STEP_SIZE,
                                     normalize: bool = True,
-                                    label_strategy: str = "instance") -> pd.DataFrame:
+                                    label_strategy: str = "instance",
+                                    smooth_filter: str = "gaussian") -> pd.DataFrame:
     """Aplica normalização por instância, janela deslizante e extrai features.
 
     Parâmetros
@@ -173,6 +224,10 @@ def extract_features_from_instance(df_instance: pd.DataFrame,
         'window'             → cada janela recebe a moda da coluna 'class'
                                (0=normal, 1-9=ativo, 101-109=transiente).
                                Janelas 100% NaN em 'class' são descartadas.
+    smooth_filter : str
+        'gaussian'     (default) → filtro Gaussiano fixo (scipy gaussian_filter1d).
+        'statistical'            → filtro adaptativo baseado na função erf;
+                                   preserva picos grandes, suaviza ruído pequeno.
 
     Retorna
     -------
@@ -221,8 +276,13 @@ def extract_features_from_instance(df_instance: pd.DataFrame,
         for sensor in sensors:
             if sensor not in window_df.columns:
                 continue
-            raw      = window_df[sensor].values.astype(float)
-            smoothed = _apply_gaussian_filter(raw)
+            raw = window_df[sensor].values.astype(float)
+            if smooth_filter == "statistical":
+                smoothed = _apply_statistical_filter(raw)
+            elif smooth_filter == "none":
+                smoothed = raw
+            else:
+                smoothed = _apply_gaussian_filter(raw)
             features.update(_extract_window_features(smoothed, sensor))
 
         rows.append(features)
@@ -236,6 +296,7 @@ def extract_features_from_dataset(df: pd.DataFrame,
                                    step_size: int = STEP_SIZE,
                                    normalize: bool = True,
                                    label_strategy: str = "instance",
+                                   smooth_filter: str = "gaussian",
                                    verbose: bool = True) -> pd.DataFrame:
     """Extrai features de todas as instâncias de um DataFrame limpo.
 
@@ -247,6 +308,8 @@ def extract_features_from_dataset(df: pd.DataFrame,
         Repassados para extract_features_from_instance.
     label_strategy : str
         'instance' ou 'window' — repassado para extract_features_from_instance.
+    smooth_filter : str
+        'gaussian' ou 'statistical' — repassado para extract_features_from_instance.
     verbose : bool
         Se True, imprime progresso a cada 50 instâncias.
     """
@@ -260,6 +323,7 @@ def extract_features_from_dataset(df: pd.DataFrame,
         feat_df = extract_features_from_instance(
             df_inst, sensors, window_size, step_size,
             normalize=normalize, label_strategy=label_strategy,
+            smooth_filter=smooth_filter,
         )
         all_features.append(feat_df)
 
@@ -302,6 +366,7 @@ def run_pipeline_chunked(max_instances_per_class: int | None = None,
                           step_size: int = STEP_SIZE,
                           normalize: bool = True,
                           label_strategy: str = "instance",
+                          smooth_filter: str = "gaussian",
                           cleaned_path: Path = CLEANED_DATA_PATH,
                           features_path: Path = FEATURES_DATA_PATH,
                           verbose: bool = True) -> None:
@@ -414,6 +479,7 @@ def run_pipeline_chunked(max_instances_per_class: int | None = None,
                 df_clean, sensors=sensors,
                 window_size=window_size, step_size=step_size,
                 label_strategy=label_strategy,
+                smooth_filter=smooth_filter,
                 normalize=normalize, verbose=False,
             )
             del df_clean
@@ -451,6 +517,7 @@ def run_pipeline_from_cleaned(
     window_size: int = WINDOW_SIZE,
     step_size: int = STEP_SIZE,
     normalize: bool = True,
+    smooth_filter: str = "gaussian",
     flush_every: int = 50,
     verbose: bool = True,
 ) -> None:
@@ -502,6 +569,7 @@ def run_pipeline_from_cleaned(
                     step_size=step_size,
                     normalize=normalize,
                     label_strategy=label_strategy,
+                    smooth_filter=smooth_filter,
                 )
                 if df_feat is not None and len(df_feat) > 0:
                     feat_rows.append(df_feat)

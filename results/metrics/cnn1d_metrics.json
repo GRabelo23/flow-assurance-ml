@@ -1,0 +1,34 @@
+{
+  "model": "FCN_1D_v3",
+  "f1_macro": 0.6685485049372027,
+  "f1_weighted": 0.7167994264650942,
+  "accuracy": 0.7107000031069822,
+  "f1_per_fold": [
+    0.6600841179664947,
+    0.668121641883944,
+    0.6725233282657542,
+    0.6657194229453947,
+    0.6753035119194767
+  ],
+  "per_class_f1": {
+    "Normal": 0.6116264382019386,
+    "BSW (Ativo)": 0.6691904914083434,
+    "DHSV (Ativo)": 0.8961196443007275,
+    "Golfadas (Ativo)": 0.9170349632751923,
+    "Inst. Fluxo (Ativo)": 0.47270474209466484,
+    "Prod. Rapida (Ativo)": 0.8880599211254341,
+    "PCK Restrict. (Ativo)": 0.6924026775849743,
+    "PCK Incrust. (Ativo)": 0.18160237388724035,
+    "Hidrato Prod. (Ativo)": 0.794367322480775,
+    "Hidrato Serv. (Ativo)": 0.9403568083696918,
+    "BSW (Trans.)": 0.6847960797162352,
+    "DHSV (Trans.)": 0.3853144311159578,
+    "Golfadas (Trans.)": 0.0,
+    "Inst. Fluxo (Trans.)": 0.0,
+    "Prod. Rapida (Trans.)": 0.5928524764693073,
+    "PCK Restrict. (Trans.)": 0.4515438026296351,
+    "PCK Incrust. (Trans.)": 0.6071436378341749,
+    "Hidrato Prod. (Trans.)": 0.763753667968674,
+    "Hidrato Serv. (Trans.)": 0.8164551054694792
+  }
+}

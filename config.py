@@ -94,7 +94,9 @@ MAX_MISSING_RATIO = 0.50  # Instâncias com >50% NaN no sensor crítico são des
 
 WINDOW_SIZE = 300    # 300 segundos por janela
 STEP_SIZE = 150      # 50% de sobreposição entre janelas
-GAUSSIAN_SIGMA = 2.0 # Sigma do filtro Gaussiano (suavização de ruído)
+GAUSSIAN_SIGMA = 2.0     # Sigma do filtro Gaussiano (suavização de ruído)
+STATISTICAL_SIGMA = 0.5  # Erro típico de medição do filtro estatístico adaptativo
+                          # (em unidades z-score; mudanças menores que ~1×sigma são suavizadas)
 
 # ── Parâmetros da Etapa 4 — Modelagem ────────────────────────────────────────
 # Os valores se adaptam automaticamente ao modo de execução.
