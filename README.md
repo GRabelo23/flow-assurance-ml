@@ -7,7 +7,7 @@
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13%2B-FF6F00?logo=tensorflow&logoColor=white)
 ![License](https://img.shields.io/badge/Licença-Acadêmica-lightgrey)
 
-Pipeline completo de Machine Learning para **classificação do estado operacional de poços de petróleo offshore** a partir de séries temporais de sensores, utilizando o [3W Dataset](https://github.com/ricardovvargas/3w_dataset) da Petrobras.
+Pipeline completo de Machine Learning para **classificação do estado operacional de poços de petróleo offshore** a partir de séries temporais de sensores, utilizando o [3W Dataset](https://github.com/petrobras/3w) da Petrobras.
 
 ---
 
@@ -302,6 +302,6 @@ rabelogabriel23@gmail.com
 ---
 
 **Dataset:** 3W Dataset — Petrobras / Vaz Vargas et al.  
-Repositório oficial: [github.com/ricardovvargas/3w_dataset](https://github.com/ricardovvargas/3w_dataset)
+Repositório oficial: [github.com/petrobras/3W](https://github.com/petrobras/3W)
 
 > Este projeto é de uso acadêmico. Os dados do 3W Dataset estão sujeitos à licença original da Petrobras.
