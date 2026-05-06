@@ -19,7 +19,6 @@ Pipeline completo de Machine Learning para **classificação do estado operacion
 - [Resultados](#resultados)
 - [Estrutura do Repositório](#estrutura-do-repositório)
 - [Instalação](#instalação)
-- [Como Usar](#como-usar)
 - [Configuração](#configuração)
 - [Stack Tecnológica](#stack-tecnológica)
 - [Autor](#autor)
