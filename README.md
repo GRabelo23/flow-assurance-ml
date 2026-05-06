@@ -106,13 +106,13 @@ Janelamento deslizante com 11 estatísticas por sensor:
 
 ### CNN-1D (FCN)
 
-Rede Totalmente Convolucional treinada diretamente sobre a série temporal bruta (sem features artesanais):
+Fully Convolutional Network treinada diretamente sobre a série temporal bruta:
 
 ```
 Conv1D(128, 8) → BN → Conv1D(256, 5) → BN → Conv1D(128, 3) → BN → GlobalAvgPool → Dense(17)
 ```
 
-- EarlyStopping monitorando F1-macro (não val_loss) — via callback customizado
+- EarlyStopping monitorando F1-macro
 - Inferência em chunks de 8.192 janelas para evitar OOM
 
 ---
@@ -257,60 +257,6 @@ pip install -r requirements.txt
 
 ```bash
 python -c "import config; print('OK — RAW_DATA_DIR:', config.RAW_DATA_DIR)"
-```
-
----
-
-## Como Usar
-
-### Opção 1 — Ver resultados (sem re-treinar)
-
-```bash
-jupyter notebook notebooks/00_pipeline_completo.ipynb
-```
-
-Carrega modelos e métricas já computados. Executa em < 1 minuto.
-
-### Opção 2 — Reproduzir do zero
-
-Execute em ordem:
-
-```bash
-# 1. Gerar features (17 classes)
-python scripts/run_pipeline_window_class.py
-
-# 2. Treinar modelos de ensemble
-python scripts/train_rf_window_class.py
-python scripts/train_xgboost_window_class.py     # filtro Gaussiano
-python scripts/train_xgboost_nofilter.py         # sem filtro
-python scripts/train_xgboost_statistical.py      # filtro estatístico
-
-# 3. Treinar CNN-1D (requer TensorFlow + GPU recomendada)
-python scripts/train_cnn1d.py
-
-# 4. Validação de generalização
-python scripts/train_rf_nested_cv.py             # ~3–4 h, 300 fits
-
-# 5. Gerar figuras
-python scripts/plot_confusion_matrix.py
-python scripts/plot_shap_statistical_vs_nofilter.py
-```
-
-### Tempos estimados (CPU — Intel i7 / 16 GB RAM)
-
-| Script | Tempo estimado |
-|--------|---------------|
-| `run_pipeline_window_class.py` | 1–2 h |
-| `train_rf_window_class.py` | ~1 h |
-| `train_xgboost_window_class.py` | ~1 h |
-| `train_cnn1d.py` | 2–4 h (GPU) / 8–12 h (CPU) |
-| `train_rf_nested_cv.py` | 3–4 h |
-
-### Modo rápido (validação do pipeline)
-
-```python
-# config.py
-VALIDATION_MODE = True  # processa apenas 5 instâncias por classe
 ```
 
 ---
