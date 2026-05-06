@@ -37,6 +37,9 @@ env/
 *.swp
 *.swo
 
+# ── Claude Code (configuração local) ─────────────────────────────────────────
+.claude/
+
 # ── Sistema operacional ───────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
