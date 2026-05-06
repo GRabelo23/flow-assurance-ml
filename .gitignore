@@ -39,6 +39,7 @@ env/
 
 # ── Claude Code (configuração local) ─────────────────────────────────────────
 .claude/
+CLAUDE.md
 
 # ── Sistema operacional ───────────────────────────────────────────────────────
 .DS_Store
