@@ -1,128 +1,137 @@
-# Análise e Modelagem Integrada de Dados de Garantia de Escoamento
+# Flow Assurance ML — Detecção de Falhas em Poços de Petróleo
 
 > **Trabalho de Conclusão de Curso** — Engenharia Mecatrônica, Universidade de Brasília (2026)
->
-> Detecção e diagnóstico de falhas em poços de petróleo a partir de séries temporais de sensores, usando o [3W Dataset](https://github.com/ricardovvargas/3w_dataset) da Petrobras.
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-orange?logo=scikit-learn&logoColor=white)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13%2B-FF6F00?logo=tensorflow&logoColor=white)
+![License](https://img.shields.io/badge/Licença-Acadêmica-lightgrey)
+
+Pipeline completo de Machine Learning para **classificação do estado operacional de poços de petróleo offshore** a partir de séries temporais de sensores, utilizando o [3W Dataset](https://github.com/ricardovvargas/3w_dataset) da Petrobras.
 
 ---
 
 ## Sumário
 
-- [Contexto](#contexto)
-- [Problema](#problema)
+- [Visão Geral](#visão-geral)
+- [Dataset](#dataset)
 - [Metodologia](#metodologia)
 - [Resultados](#resultados)
 - [Estrutura do Repositório](#estrutura-do-repositório)
 - [Instalação](#instalação)
 - [Como Usar](#como-usar)
-- [Notebooks](#notebooks)
-- [Scripts de Treinamento](#scripts-de-treinamento)
 - [Configuração](#configuração)
 - [Stack Tecnológica](#stack-tecnológica)
 - [Autor](#autor)
 
 ---
 
-## Contexto
+## Visão Geral
 
-Poços de petróleo offshore são monitorados continuamente por sensores de pressão e temperatura. Falhas como formação de hidratos, incrustação no choke ou golfadas severas podem interromper a produção ou causar danos ao equipamento. A detecção precoce dessas anomalias em tempo real é um problema crítico para a indústria.
+Poços de petróleo offshore são monitorados por sensores de pressão e temperatura. Falhas como formação de hidratos, incrustação no choke e golfadas severas podem interromper a produção ou danificar equipamentos. A detecção precoce em tempo real é um problema crítico.
 
-Este projeto desenvolve um pipeline completo de Machine Learning para duas tarefas complementares de classificação, usando o **3W Dataset** — base de dados pública da Petrobras com séries temporais reais, simuladas e sintéticas de 10 tipos de eventos em poços instrumentados.
+Este projeto desenvolve e compara três abordagens de ML para classificar, a partir de uma **janela de 300 s de dados de sensores**, o estado operacional atual de um poço entre **17 classes** (operação normal, 9 eventos ativos e 7 estados transientes):
+
+| Abordagem | Modelos | Input |
+|-----------|---------|-------|
+| Ensemble com features artesanais | Random Forest, XGBoost | 88 features estatísticas |
+| Rede neural sobre série bruta | CNN-1D (FCN) | Série temporal raw (300 × 8) |
+
+A comparação direta entre as duas abordagens é o eixo central do trabalho: **qual o ganho da engenharia de features manual sobre representações aprendidas automaticamente?**
 
 ---
 
-## Problema
+## Dataset
 
-### Abordagem 1 — Diagnóstico por Instância (10 classes)
+O **3W Dataset** é uma base pública da Petrobras com séries temporais reais, simuladas e sintéticas de 10 tipos de eventos em poços instrumentados.
 
-Dada uma janela de 300 s de leituras de sensores, identificar **qual tipo de falha** está associado àquele poço.
+| Item | Valor |
+|------|-------|
+| Instâncias (poços) | 1.409 |
+| Janelas processadas | 449.397 |
+| Sensores | 8 (pressão e temperatura) |
+| Features por janela | 88 |
+| Classes no dataset | 17 |
+| Janela / passo | 300 s / 150 s (50% sobreposição) |
 
-- 10 classes: Normal + 9 tipos de falha
-- Uso: diagnóstico retroativo ("esse poço teve qual evento?")
+**Sensores:** P-PDG, T-PDG, P-TPT, T-TPT, P-MON-CKP, T-JUS-CKP, P-JUS-CKGL, QGL
 
-### Abordagem 2 — Detecção de Estado Operacional (19 classes)
+**Classes:**
 
-Classificar o estado instantâneo da janela: **normal**, **transiente** (falha se aproximando) ou **evento ativo**, por tipo de falha.
+| Código | Estado | Código | Estado |
+|--------|--------|--------|--------|
+| 0 | Operação Normal | — | — |
+| 1 | BSW Abrupto (ativo) | 101 | BSW Abrupto (transiente) |
+| 2 | DHSV Espúrio (ativo) | 102 | DHSV Espúrio (transiente) |
+| 3 | Golfadas Severas (ativo) | — | *(ausente no dataset)* |
+| 4 | Instabilidade de Fluxo (ativo) | — | *(ausente no dataset)* |
+| 5 | Perda de Produtividade (ativo) | 105 | Perda de Produtividade (trans.) |
+| 6 | Restrição no PCK (ativo) | 106 | Restrição no PCK (trans.) |
+| 7 | Incrustação no PCK (ativo) | 107 | Incrustação no PCK (trans.) |
+| 8 | Hidrato Produção (ativo) | 108 | Hidrato Produção (trans.) |
+| 9 | Hidrato Serviço (ativo) | 109 | Hidrato Serviço (trans.) |
 
-- 19 classes: 0 (normal), 1–9 (evento ativo), 101–109 (transiente por tipo)
-- Uso: monitoramento em tempo real com detecção de progressão da falha
-
-| Classe | Evento |
-|--------|--------|
-| 0 | Operação normal |
-| 1 / 101 | Aumento abrupto de BSW |
-| 2 / 102 | Fechamento espúrio da DHSV |
-| 3 / 103 | Golfadas severas |
-| 4 / 104 | Instabilidade de fluxo |
-| 5 / 105 | Perda rápida de produtividade |
-| 6 / 106 | Restrição rápida no PCK |
-| 7 / 107 | Incrustação no PCK |
-| 8 / 108 | Hidrato na linha de produção |
-| 9 / 109 | Hidrato na linha de serviço |
+> Classes 103 e 104 (transientes de Golfadas e Instabilidade) estão ausentes no dataset público.
 
 ---
 
 ## Metodologia
 
-O pipeline segue seis etapas sequenciais:
-
 ```
-Dados Brutos → Limpeza → Engenharia de Features → Modelagem → Avaliação → Interpretabilidade
+Dados Brutos → Limpeza → Features → Rotulagem → Modelagem → Avaliação → Interpretabilidade
 ```
 
-### 1. Dados Brutos
-- 1.409 instâncias (poços), ~471k timestamps
-- 8 sensores de pressão e temperatura: P-PDG, T-PDG, P-TPT, T-TPT, P-MON-CKP, T-JUS-CKP, P-JUS-CKGL, QGL
-- Três origens: dados reais de campo (WELL), simulados e sintéticos (DRAWN)
+### Pré-processamento
 
-### 2. Limpeza
-- Forward-fill causal ≤ 60 s (sem vazamento de informação futura)
-- Descarte de instâncias com > 50% de NaN no sensor crítico (P-TPT)
-- Z-score por instância: normaliza poços com faixas de operação distintas
+- Forward-fill causal ≤ 60 s (sem uso de dados futuros)
+- Descarte de instâncias com > 50% de NaN no sensor P-TPT
+- Z-score por instância (poços operam em faixas absolutas distintas)
+- Filtragem de sinal: Gaussiano (σ=2), filtro estatístico adaptativo ou sem filtro
 
-### 3. Engenharia de Features
-- Janela deslizante: 300 s com 50% de sobreposição (step = 150 s)
-- 11 estatísticas por sensor: `mean`, `std`, `min`, `max`, `iqr`, `skewness`, `kurtosis`,`median`, `diff1_std`, `diff2_std`, `max_zscore`
-- **88 features** no total (8 sensores × 11 estatísticas)
-- Outliers preservados via `max_zscore` (picos são assinatura da falha)
+### Engenharia de Features
 
-### 4. Rotulagem
-- **Abordagem 1:** janela herda a `fault_class` do poço inteiro
-- **Abordagem 2:** janela recebe a moda da coluna `class` dentro da janela; janelas 100% NaN são descartadas
+Janelamento deslizante com 11 estatísticas por sensor:
 
-### 5. Modelagem
-- **Separação:** `GroupKFold(n_splits=5)` por `instance_id` — janelas do mesmo poço nunca aparecem em treino e teste simultaneamente
-- `class_weight='balanced'` para compensar desbalanceamento severo
-- **Modelos:** Random Forest e XGBoost com busca de hiperparâmetros (`RandomizedSearchCV`)
-- **Validação do overfitting:** Nested CV 5×3 (300 fits) — delta F1 vs. flat CV = −0.0095
+`mean`, `std`, `min`, `max`, `iqr`, `skewness`, `kurtosis`, `median`, `diff1_std`, `diff2_std`, `max_zscore`
 
-### 6. Interpretabilidade (XAI)
-- **MDI (Mean Decrease in Impurity):** importância embutida nos modelos de árvore
-- **SHAP TreeExplainer:** valores exatos para RF e XGBoost; amostragem balanceada de 50 janelas por classe (850 total)
-- Análise por sensor, por modelo e por classe de falha
+→ **88 features** por janela (8 sensores × 11 estatísticas)
+
+> Outliers são preservados via `max_zscore` — picos de pressão são assinatura de falha, não ruído.
+
+### Validação
+
+- **GroupKFold(5) por `instance_id`** — janelas do mesmo poço nunca aparecem em treino e teste simultaneamente
+- `class_weight='balanced'` — compensa desbalanceamento severo (até 112:1 entre classes)
+- **Nested CV 5×3** (300 fits) para quantificar viés de seleção de hiperparâmetros
+
+### CNN-1D (FCN)
+
+Rede Totalmente Convolucional treinada diretamente sobre a série temporal bruta (sem features artesanais):
+
+```
+Conv1D(128, 8) → BN → Conv1D(256, 5) → BN → Conv1D(128, 3) → BN → GlobalAvgPool → Dense(17)
+```
+
+- EarlyStopping monitorando F1-macro (não val_loss) — via callback customizado
+- Inferência em chunks de 8.192 janelas para evitar OOM
 
 ---
 
 ## Resultados
 
-### Abordagem 1 — Random Forest (10 classes)
+### Comparação Global — Estado Operacional (17 classes)
 
-| Métrica | Valor |
-|---------|-------|
-| F1-macro (CV) | **0.9558** |
-| Número de janelas | 471.477 |
-| Features | 88 |
+| Modelo | Filtro | F1-macro | F1-weighted | Accuracy |
+|--------|--------|:--------:|:-----------:|:--------:|
+| Random Forest | Gaussiano | 0.8716 | 0.9308 | 0.9322 |
+| XGBoost | Sem filtro | 0.9065 | 0.9339 | 0.9345 |
+| XGBoost | Estatístico | 0.9067 | 0.9401 | 0.9402 |
+| **XGBoost** | **Gaussiano** | **0.9082** | 0.9361 | 0.9364 |
+| CNN-1D (FCN) | Gaussiano | 0.6685 | 0.7168 | 0.7107 |
 
-### Abordagem 2 — Estado Operacional (19 classes)
+> **XGBoost + filtro Gaussiano** é o melhor modelo global. A CNN-1D opera sem qualquer engenharia de features — a diferença de 24 p.p. evidencia o valor das features artesanais (em particular `diff1_std` e `diff2_std`) para detecção de estados transientes.
 
-| Métrica | Random Forest | XGBoost |
-|---------|--------------|---------|
-| F1-macro | 0.8716 | **0.9082** |
-| F1-weighted | 0.9308 | **0.9340** |
-| Accuracy | 0.9322 | **0.9364** |
-| F1-macro (CV) | 0.8827 | **0.8866** |
-
-**Nested CV (RF — validação de generalização)**
+### Generalização — Nested CV (RF)
 
 | Estatística | Valor |
 |-------------|-------|
@@ -130,85 +139,89 @@ Dados Brutos → Limpeza → Engenharia de Features → Modelagem → Avaliaçã
 | Desvio padrão | ±0.0202 |
 | Delta vs. flat CV | −0.0095 |
 
-> Delta próximo de zero indica **ausência de overfitting** — o modelo generaliza para poços nunca vistos.
+> Delta < 1 p.p. confirma que o flat CV com GroupKFold é uma estratégia de avaliação metodologicamente honesta — sem overfitting de hiperparâmetros.
 
-### Destaques por Classe
+### Destaques por Classe (XGBoost vs CNN-1D)
 
-| Classe | RF F1 | XGBoost F1 | Observação |
-|--------|-------|-----------|------------|
-| 7 — PCK Incrustação | 0.009 | **0.571** | Classe rara (0,2% do dataset); XGBoost detecta via boosting sequencial |
-| 102 — DHSV Transiente | 0.793 | 0.850 | Dinâmica transiente capturada por `diff1_std` e `skewness` |
-| 8 — Hidrato Produção | 0.860 | 0.890 | T-JUS-CKP_min e P-MON-CKP_max validados fisicamente |
-| 9 — Hidrato Serviço | 0.991 | 0.993 | Classe mais fácil de detectar |
+| Classe | XGBoost F1 | CNN-1D F1 | Observação |
+|--------|:----------:|:---------:|------------|
+| 9 — Hidrato Serviço (ativo) | 0.993 | **0.940** | Ambos excelentes |
+| 3 — Golfadas (ativo) | 0.913 | **0.917** | CNN-1D próxima do XGBoost |
+| 7 — PCK Incrustação (ativo) | **0.571** | 0.182 | Classe rara: boosting supera CNN |
+| 102 — DHSV (transiente) | **0.850** | 0.385 | Transientes dependem de `diff1_std` |
+| 107 — PCK Incrustação (trans.) | **0.620** | 0.000 | CNN não aprende derivadas implícitas |
 
-### Top Features (SHAP Global — Abordagem 2)
+### Top Features — SHAP Global (XGBoost)
 
-| Rank | Feature | Importância |
-|------|---------|-------------|
-| 1 | T-TPT\_std | Maior variabilidade global |
-| 2 | P-PDG\_mean | Pressão de fundo média |
-| 3 | P-TPT\_max | Pico de pressão na árvore de natal |
+| Rank | Feature | Interpretação |
+|------|---------|---------------|
+| 1 | `T-TPT_std` | Variabilidade de temperatura na árvore de natal molhada |
+| 2 | `P-PDG_mean` | Pressão de fundo média |
+| 3 | `P-TPT_max` | Pico de pressão na árvore de natal |
+
+> `T-TPT` domina globalmente por conta da alta prevalência dos eventos de hidrato no 3W Dataset.
 
 ---
 
 ## Estrutura do Repositório
 
 ```
-TCC/
-├── README.md                        ← este arquivo
-├── CLAUDE.md                        ← instruções para o assistente de código
+flow-assurance-ml/
 ├── config.py                        ← caminhos e constantes centralizados
-├── requirements.txt                 ← dependências Python
+├── requirements.txt
 │
-├── src/                             ← módulos reutilizáveis
+├── src/
 │   ├── data_loader.py               ← leitura dos parquets brutos do 3W
-│   ├── feature_engineering.py      ← janela deslizante, 88 features, rotulagem
-│   ├── evaluation.py               ← métricas, plots de avaliação
-│   └── visualization.py            ← geração de gráficos 
+│   ├── feature_engineering.py       ← janela deslizante, 88 features, rotulagem
+│   ├── evaluation.py                ← métricas e plots de avaliação
+│   └── visualization.py            ← gráficos padronizados
 │
-├── scripts/                         ← execução standalone de tarefas longas
+├── scripts/
 │   ├── run_pipeline_window_class.py ← gera features_window_class.parquet
-│   ├── train_random_forest.py       ← treina RF Abordagem 1 (10 classes)
-│   ├── train_rf_window_class.py     ← treina RF Abordagem 2 (19 classes)
-│   ├── train_xgboost.py             ← treina XGBoost Abordagem 1
-│   ├── train_xgboost_window_class.py← treina XGBoost Abordagem 2
-│   ├── train_rf_nested_cv.py        ← validação nested CV (anti-overfitting)
-│   └── plot_confusion_matrix.py     ← gera matrizes de confusão
+│   ├── train_random_forest.py       ← RF diagnóstico (10 classes)
+│   ├── train_rf_window_class.py     ← RF estado operacional (17 classes)
+│   ├── train_rf_nested_cv.py        ← validação nested CV (300 fits)
+│   ├── train_xgboost.py             ← XGBoost diagnóstico (10 classes)
+│   ├── train_xgboost_window_class.py       ← XGBoost + filtro Gaussiano
+│   ├── train_xgboost_nofilter.py           ← XGBoost + sem filtro
+│   ├── train_xgboost_statistical.py        ← XGBoost + filtro estatístico
+│   ├── train_cnn1d.py               ← CNN-1D (FCN) sobre série bruta
+│   ├── plot_confusion_matrix.py     ← matrizes de confusão
+│   └── plot_shap_statistical_vs_nofilter.py ← comparação SHAP entre filtros
 │
 ├── notebooks/
-│   ├── 00_pipeline_completo.ipynb   ← notebook mestre: pipeline completo e resultados
+│   ├── 00_pipeline_completo.ipynb   ← pipeline completo com todos os resultados
 │   ├── 01_analise_exploratoria.ipynb
 │   ├── 02_limpeza_preparacao.ipynb
 │   ├── 03_engenharia_features.ipynb
 │   ├── 04_modelagem.ipynb
 │   ├── 05_avaliacao.ipynb
-│   └── 06_interpretacao.ipynb       ← SHAP e MDI (XAI)
+│   └── 06_interpretacao.ipynb       ← SHAP e interpretabilidade
 │
-├── data/
-│   └── processed/
-│       ├── cleaned.parquet              ← séries temporais limpas
-│       ├── features.parquet             ← features Abordagem 1
-│       └── features_window_class.parquet← features Abordagem 2 (449k janelas)
+├── data/processed/                  ← gerado localmente (não versionado)
+│   ├── cleaned.parquet
+│   ├── features.parquet             ← 10 classes (diagnóstico)
+│   └── features_window_class.parquet ← 17 classes (estado operacional)
 │
 ├── results/
-│   ├── models/                      ← modelos treinados (.joblib)
-│   │   ├── random_forest.joblib
-│   │   ├── rf_window_class.joblib
-│   │   ├── xgboost_window_class.joblib
-│   │   ├── imputer_window_class.joblib
-│   │   └── label_encoder_window_class.joblib
-│   ├── metrics/                     ← métricas em JSON
-│   │   ├── random_forest_metrics.json
+│   ├── models/                      ← modelos treinados (.joblib, não versionados)
+│   ├── metrics/                     ← métricas em JSON/CSV
 │   │   ├── rf_window_class_metrics.json
 │   │   ├── xgboost_window_class_metrics.json
+│   │   ├── xgboost_nofilter_metrics.json
+│   │   ├── xgboost_statistical_metrics.json
+│   │   ├── cnn1d_metrics.json
 │   │   └── rf_nested_cv_results.json
-│   └── figures/                     ← gráficos 
-│       ├── eda/
+│   └── figures/
 │       ├── confusion_matrix/
-│       └── shap/
+│       ├── shap/
+│       ├── eda/
+│       └── time_series/
 │
 └── docs/
-    └── metodologia.md               ← documentação técnica detalhada do pipeline
+    ├── metodologia.md               ← documentação técnica detalhada do pipeline
+    ├── model_results.md             ← resultados completos por classe
+    └── cnn_tensorflow.md            ← implementação e otimizações da CNN-1D
 ```
 
 ---
@@ -217,16 +230,16 @@ TCC/
 
 ### Pré-requisitos
 
-- Python 3.10 ou superior
-- 3W Dataset baixado localmente (ver [repositório oficial](https://github.com/ricardovvargas/3w_dataset))
-- ~4 GB de RAM disponível para o pipeline completo
+- Python 3.10+
+- [3W Dataset](https://github.com/ricardovvargas/3w_dataset) baixado localmente
+- ~4 GB de RAM para o pipeline de features; ~2 GB para inferência da CNN
 
 ### Passos
 
 ```bash
 # 1. Clone o repositório
-git clone <url-do-repositório>
-cd TCC
+git clone https://github.com/GRabelo23/flow-assurance-ml.git
+cd flow-assurance-ml
 
 # 2. Crie um ambiente virtual
 python -m venv .venv
@@ -236,148 +249,114 @@ source .venv/bin/activate        # Linux/macOS
 # 3. Instale as dependências
 pip install -r requirements.txt
 
-# 4. Configure o caminho do dataset em config.py
-#    Edite a variável RAW_DATA_DIR para apontar para a pasta do 3W Dataset
+# 4. Aponte para o dataset em config.py
+#    Edite RAW_DATA_DIR para o caminho local do 3W Dataset
 ```
 
 ### Verificação
 
 ```bash
-python -c "import config; print('RAW_DATA_DIR:', config.RAW_DATA_DIR)"
+python -c "import config; print('OK — RAW_DATA_DIR:', config.RAW_DATA_DIR)"
 ```
 
 ---
 
 ## Como Usar
 
-### Opção 1 — Notebook Mestre (recomendado para visualizar resultados)
-
-Abra `notebooks/00_pipeline_completo.ipynb`. Ele carrega os modelos e resultados já computados e executa em menos de 1 minuto, mostrando todas as etapas e figuras do pipeline.
+### Opção 1 — Ver resultados (sem re-treinar)
 
 ```bash
 jupyter notebook notebooks/00_pipeline_completo.ipynb
 ```
 
-### Opção 2 — Reproduzir o Pipeline Completo do Zero
+Carrega modelos e métricas já computados. Executa em < 1 minuto.
 
-Execute os passos abaixo em ordem. Cada etapa pode levar de minutos a horas dependendo do hardware.
+### Opção 2 — Reproduzir do zero
 
-#### Etapa 1 — Gerar features (Abordagem 2)
+Execute em ordem:
 
 ```bash
+# 1. Gerar features (17 classes)
 python scripts/run_pipeline_window_class.py
-```
 
-Gera `data/processed/features_window_class.parquet` (~449k janelas, 88 features).
-
-#### Etapa 2 — Treinar os modelos
-
-```bash
-# Random Forest — Abordagem 2 (19 classes)
+# 2. Treinar modelos de ensemble
 python scripts/train_rf_window_class.py
+python scripts/train_xgboost_window_class.py     # filtro Gaussiano
+python scripts/train_xgboost_nofilter.py         # sem filtro
+python scripts/train_xgboost_statistical.py      # filtro estatístico
 
-# XGBoost — Abordagem 2 (19 classes)
-python scripts/train_xgboost_window_class.py
+# 3. Treinar CNN-1D (requer TensorFlow + GPU recomendada)
+python scripts/train_cnn1d.py
 
-# Random Forest — validação com Nested CV
-python scripts/train_rf_nested_cv.py
+# 4. Validação de generalização
+python scripts/train_rf_nested_cv.py             # ~3–4 h, 300 fits
+
+# 5. Gerar figuras
+python scripts/plot_confusion_matrix.py
+python scripts/plot_shap_statistical_vs_nofilter.py
 ```
 
-Modelos salvos em `results/models/`. Métricas salvas em `results/metrics/`.
+### Tempos estimados (CPU — Intel i7 / 16 GB RAM)
 
-#### Etapa 3 — Interpretabilidade (SHAP)
+| Script | Tempo estimado |
+|--------|---------------|
+| `run_pipeline_window_class.py` | 1–2 h |
+| `train_rf_window_class.py` | ~1 h |
+| `train_xgboost_window_class.py` | ~1 h |
+| `train_cnn1d.py` | 2–4 h (GPU) / 8–12 h (CPU) |
+| `train_rf_nested_cv.py` | 3–4 h |
 
-Execute o notebook `notebooks/06_interpretacao.ipynb`. O cálculo dos SHAP values usa 50 janelas por classe (850 total) para viabilizar o tempo de execução com árvores profundas.
-
-### Modo de Validação Rápida
-
-Para testar o pipeline sem processar o dataset completo, ative o modo de validação em `config.py`:
+### Modo rápido (validação do pipeline)
 
 ```python
-VALIDATION_MODE = True   # processa apenas 5 instâncias por classe
+# config.py
+VALIDATION_MODE = True  # processa apenas 5 instâncias por classe
 ```
-
----
-
-## Notebooks
-
-| Notebook | Conteúdo | Execução |
-|----------|----------|----------|
-| `00_pipeline_completo.ipynb` | Pipeline completo com todos os resultados | < 1 min |
-| `01_analise_exploratoria.ipynb` | EDA: distribuição de classes, sensores, missing data | ~5 min |
-| `02_limpeza_preparacao.ipynb` | Forward-fill, z-score, descarte de instâncias | ~10 min |
-| `03_engenharia_features.ipynb` | Janela deslizante, 88 features, rotulagem | ~30 min |
-| `04_modelagem.ipynb` | Treinamento RF e XGBoost com busca de hiperparâmetros | ~2 h |
-| `05_avaliacao.ipynb` | Métricas, matrizes de confusão, curvas ROC | ~5 min |
-| `06_interpretacao.ipynb` | MDI, SHAP global, por sensor e por classe | ~15 min |
-
----
-
-## Scripts de Treinamento
-
-Scripts autônomos para tarefas computacionalmente intensas, adequados para execução em background ou servidor remoto.
-
-| Script | Tarefa | Tempo estimado |
-|--------|--------|---------------|
-| `run_pipeline_window_class.py` | Geração de features Abordagem 2 | ~1–2 h |
-| `train_random_forest.py` | RF Abordagem 1 (10 classes) | ~30 min |
-| `train_rf_window_class.py` | RF Abordagem 2 (19 classes) | ~1 h |
-| `train_xgboost_window_class.py` | XGBoost Abordagem 2 | ~1 h |
-| `train_rf_nested_cv.py` | Nested CV (300 fits — anti-overfitting) | ~3–4 h |
-| `plot_confusion_matrix.py` | Matrizes de confusão dos modelos | ~2 min |
 
 ---
 
 ## Configuração
 
-Todas as constantes do projeto ficam centralizadas em `config.py`. Os principais parâmetros:
+Todas as constantes ficam em `config.py`:
 
 | Parâmetro | Padrão | Descrição |
 |-----------|--------|-----------|
 | `RAW_DATA_DIR` | *(definir localmente)* | Caminho para o 3W Dataset |
-| `VALIDATION_MODE` | `False` | `True` = pipeline rápido (5 instâncias/classe) |
+| `VALIDATION_MODE` | `False` | Pipeline rápido (5 inst./classe) |
 | `WINDOW_SIZE` | `300` | Tamanho da janela em segundos |
 | `STEP_SIZE` | `150` | Passo entre janelas (50% sobreposição) |
-| `FFILL_LIMIT` | `60` | Máximo de forward-fill em segundos |
-| `MAX_MISSING_RATIO` | `0.50` | Limiar de NaN para descarte da instância |
-| `RANDOM_STATE` | `42` | Semente global de aleatoriedade |
-| `N_SPLITS_CV` | `5` | Número de folds no GroupKFold |
+| `FFILL_LIMIT` | `60` | Limite máximo de forward-fill (s) |
+| `MAX_MISSING_RATIO` | `0.50` | Limiar de NaN para descarte |
+| `RANDOM_STATE` | `42` | Semente global |
+| `N_SPLITS_CV` | `5` | Folds no GroupKFold |
 | `N_ITER_SEARCH` | `20` | Iterações do RandomizedSearchCV |
 
 ---
 
 ## Stack Tecnológica
 
-| Biblioteca | Versão mínima | Uso |
-|-----------|--------------|-----|
-| Python | 3.10 | Linguagem base |
-| pandas | 2.0 | Manipulação de séries temporais e DataFrames |
-| numpy | 1.24 | Operações numéricas vetorizadas |
-| scikit-learn | 1.3 | Random Forest, validação cruzada, pré-processamento |
-| xgboost | 2.0 | Gradient boosting para classes desbalanceadas |
-| shap | 0.44 | Interpretabilidade (SHAP TreeExplainer) |
-| imbalanced-learn | 0.11 | Estratégias para classes raras |
-| pyarrow | 14.0 | Leitura/escrita de Parquet |
-| matplotlib / seaborn | 3.7 / 0.12 | Visualizações |
-| joblib | 1.3 | Serialização de modelos e paralelismo |
-| jupyter | 1.0 | Ambiente de notebooks |
+| Biblioteca | Uso principal |
+|-----------|--------------|
+| pandas / numpy | Manipulação de séries temporais e DataFrames |
+| scikit-learn | Random Forest, GroupKFold, pré-processamento |
+| xgboost | Gradient boosting para classes desbalanceadas |
+| tensorflow / keras | CNN-1D (FCN) com pipeline tf.data |
+| shap | Interpretabilidade (TreeExplainer) |
+| pyarrow | Leitura/escrita de Parquet |
+| matplotlib / seaborn | Visualizações |
+| joblib | Serialização de modelos e paralelismo |
 
 ---
 
 ## Autor
 
-**Gabriel Rabelo**
-
-Engenharia Mecatrônica — Universidade de Brasília (UnB)
-
-Contato: rabelogabriel23@gmail.com
-
-**Dataset:** 3W Dataset — Petrobras / Ricardo Vargas et al.
-
-Referência: [github.com/ricardovvargas/3w_dataset](https://github.com/ricardovvargas/3w_dataset)
+**Gabriel Rabelo**  
+Engenharia Mecatrônica — Universidade de Brasília (UnB)  
+rabelogabriel23@gmail.com
 
 ---
 
-## Licença
+**Dataset:** 3W Dataset — Petrobras / Vaz Vargas et al.  
+Repositório oficial: [github.com/ricardovvargas/3w_dataset](https://github.com/ricardovvargas/3w_dataset)
 
-Este projeto é de uso acadêmico. Os dados do 3W Dataset estão sujeitos à licença original da Petrobras — consulte o repositório oficial antes de usar os dados para outros fins.
+> Este projeto é de uso acadêmico. Os dados do 3W Dataset estão sujeitos à licença original da Petrobras.
