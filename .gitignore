@@ -41,6 +41,9 @@ env/
 .claude/
 CLAUDE.md
 
+# ── README em inglês ──────────────────────────────────────────────────────────
+README_en.md
+
 # ── Sistema operacional ───────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
