@@ -1,4 +1,4 @@
-# Flow Assurance ML — Detecção de Falhas em Poços de Petróleo
+# Análise e Modelagem Integrada de Dados de Garantias de Escoamento
 
 > **Trabalho de Conclusão de Curso** — Engenharia Mecatrônica, Universidade de Brasília (2026)
 
