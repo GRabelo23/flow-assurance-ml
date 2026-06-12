@@ -98,6 +98,16 @@ def _apply_statistical_filter(series: np.ndarray, sigma: float = STATISTICAL_SIG
     return smoothed
 
 
+def apply_filter(series: np.ndarray, filter_type: str) -> np.ndarray:
+    """Aplica o filtro especificado a uma série 1D já normalizada (z-score)."""
+    if filter_type == "gaussian":
+        return _apply_gaussian_filter(series)
+    elif filter_type == "statistical":
+        return _apply_statistical_filter(series)
+    else:  # "none"
+        return series
+
+
 def _normalize_instance_sensors(df_instance: pd.DataFrame,
                                   sensors: list[str]) -> pd.DataFrame:
     """Z-score por instância: remove diferenças de linha de base entre poços.

@@ -481,6 +481,61 @@ O `steps_per_epoch` é calculado como `n_janelas_treino // 256`, informando ao K
 
 **Hardware utilizado:** GPU RTX 2060 (6 GB VRAM) via TensorFlow 2.x com XLA habilitado. Tempo estimado de treinamento: ~1 hora para os 5 folds completos.
 
+### 10.4 CNN-LSTM
+
+**Justificativa:** A CNN-1D FCN agrega todos os timesteps da janela com peso igual no `GlobalAveragePooling1D`, perdendo a ordem temporal. A LSTM mantém um estado oculto que evolui ao longo da sequência, capturando dependências temporais de longo alcance — especialmente relevantes para estados transientes, cujo sinal discriminativo é a trajetória de mudança ao longo do tempo, não apenas a distribuição estatística.
+
+Para manter eficiência computacional, dois blocos Conv1D+MaxPool reduzem a sequência de entrada de 300 para 75 timesteps antes da LSTM. Isso torna o custo da camada recorrente 4× menor do que sobre a sequência completa, sem perda de informação de tendência: a CNN extrai padrões locais e o MaxPool comprime a representação.
+
+**Treinamento:** `scripts/train_lstm.py`
+
+#### Arquitetura CNN-LSTM
+
+```
+Input: (batch, 300, 8)   ← janela bruta após Z-score + filtro Gaussiano (sigma=2.0)
+│
+├─ Conv1D(64 filtros, kernel=5, padding='same', use_bias=False)
+│  BatchNormalization → ReLU → MaxPooling1D(pool_size=2)   → (150, 64)
+│
+├─ Conv1D(128 filtros, kernel=3, padding='same', use_bias=False)
+│  BatchNormalization → ReLU → MaxPooling1D(pool_size=2)   → (75, 128)
+│
+├─ LSTM(64 unidades)   ← processa apenas 75 passos (4× mais rápido)
+│  Dropout(0.3)        → (64,)
+│
+└─ Dense(17, activation='softmax')
+```
+
+Kernels decrescentes (5→3) capturam padrões em múltiplas escalas locais antes de comprimir a sequência. A LSTM recebe 75 vetores de 128 dimensões — cada vetor é a representação local aprendida pela CNN para aquele bloco de 4 amostras. O `Dropout(0.3)` pós-LSTM regulariza sem usar `recurrent_dropout`, compatível com a implementação CuDNN quando GPU está disponível.
+
+#### Diferenças em relação à CNN-1D FCN
+
+| Aspecto | CNN-1D FCN | CNN-LSTM |
+|---------|-----------|----------|
+| Memória temporal | Nenhuma (`GlobalAvgPool` agrega com peso igual) | Explícita (estado oculto da LSTM evolui no tempo) |
+| Timesteps para camada final | 300 (após pools o GAP agrega tudo) | 75 (MaxPool reduz antes da LSTM) |
+| Batch size | 256 | 512 |
+| Saída principal | `results/metrics/cnn1d_metrics.json` | `results/metrics/lstm_metrics.json` |
+
+#### Pipeline de Dados e Procedimento de Treinamento
+
+Idênticos à CNN-1D: gerador `tf.data` com `shuffle(20.000)` + `.repeat()`, pesos de classe via `compute_class_weight('balanced')`, `GroupKFold(5)` por `instance_id`, 15% das instâncias de treino separadas para validação interna.
+
+**Critério de parada — `MacroF1Callback`:** o `val_loss` é insuficiente para classes raras (a classe 7, com 0,2% das janelas, move a perda em apenas milésimos). Um callback customizado calcula o F1-macro sobre o conjunto de validação ao final de cada época e injeta `val_f1_macro` nos logs do Keras; `EarlyStopping` e `ReduceLROnPlateau` monitoram exclusivamente essa métrica.
+
+| Hiperparâmetro | Valor | Justificativa |
+|----------------|-------|---------------|
+| Optimizer | Adam (lr=1e-3) | Padrão para redes neurais |
+| Loss | sparse_categorical_crossentropy | Aceita labels inteiros |
+| Épocas máx. | 100 | EarlyStopping interrompe antes |
+| EarlyStopping | patience=15, mode='max', restore_best_weights=True | Mais tolerante que na FCN; classes raras precisam de mais épocas |
+| ReduceLROnPlateau | patience=7, factor=0.5, min_lr=1e-5 | Reduz lr antes do Early Stopping |
+| Batch size | 512 | Maior que FCN — beneficia LSTM em CPU (menos overhead por passo) |
+
+O `steps_per_epoch` é calculado como `n_janelas_treino // 512`.
+
+**Sobre a seleção de hiperparâmetros:** diferente do RF e do XGBoost, que passam por `RandomizedSearchCV` com 20 combinações × 5 folds, a CNN-LSTM utiliza uma arquitetura fixa escolhida por decisão de projeto. Os valores foram justificados pela literatura (Wang et al., 2017; padrões estabelecidos para CNN+LSTM em séries temporais industriais) e pelas restrições computacionais do ambiente de treinamento. Uma busca automatizada com `GroupKFold(5)` seria inviável neste contexto: cada configuração candidata requereria 5 treinamentos de ~1 h cada, tornando 20 combinações equivalentes a ~100 h de processamento.
+
 ---
 
 ## 11. Avaliação e Métricas
@@ -892,3 +947,7 @@ viável quando se prioriza precisão nas classes frequentes (F1-weighted).
 | `results/figures/shap/statistical_vs_nofilter/shap_delta_f1_statistical_vs_nofilter.png` | Delta F1 por classe — Estatístico vs Sem Filtro |
 | `results/metrics/cnn1d_metrics.json` | Métricas detalhadas — CNN-1D (FCN), 5 folds OOF |
 | `results/figures/confusion_matrix/confusion_matrix_cnn1d_estado_operacional.png` | Matriz de confusão — CNN-1D |
+| `results/metrics/lstm_metrics.json` | Métricas detalhadas — CNN-LSTM, 5 folds OOF |
+| `results/metrics/lstm_oof_true.npy` | Labels verdadeiros OOF — CNN-LSTM |
+| `results/metrics/lstm_oof_pred.npy` | Predições OOF — CNN-LSTM |
+| `results/figures/confusion_matrix/confusion_matrix_lstm_estado_operacional.png` | Matriz de confusão — CNN-LSTM |

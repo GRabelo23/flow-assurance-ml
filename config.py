@@ -29,7 +29,15 @@ RAW_DATA_DIR = Path(r"D:\Documentos\UnB\Projeto Final de Curso\3W\dataset")
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 CLEANED_DATA_PATH = PROCESSED_DIR / "cleaned.parquet"
 FEATURES_DATA_PATH = PROCESSED_DIR / "features.parquet"
-FEATURES_WINDOW_PATH = PROCESSED_DIR / "features_window_class.parquet"
+FEATURES_WINDOW_PATH      = PROCESSED_DIR / "features_window_class.parquet"
+FEATURES_STATISTICAL_PATH = PROCESSED_DIR / "features_statistical_window_class.parquet"
+FEATURES_NOFILTER_PATH    = PROCESSED_DIR / "features_nofilter_window_class.parquet"
+
+FEATURES_BY_FILTER = {
+    "gaussian":    FEATURES_WINDOW_PATH,
+    "statistical": FEATURES_STATISTICAL_PATH,
+    "none":        FEATURES_NOFILTER_PATH,
+}
 
 # Resultados finais
 RESULTS_DIR = PROJECT_ROOT / "results"

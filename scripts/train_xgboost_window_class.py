@@ -12,9 +12,9 @@ nao sao contiguos, entao e aplicado um LabelEncoder antes do treino.
 O encoder e salvo em imputer_xgb_window_class.joblib para uso futuro.
 
 Execução:
-    python scripts/train_xgboost_window_class.py
+    python scripts/train_xgboost_window_class.py [--filter {gaussian,statistical,none}]
 
-Saídas:
+Saídas (sem --filter ou --filter gaussian):
     results/models/xgboost_window_class.joblib
     results/models/imputer_xgb_window_class.joblib
     results/models/label_encoder_window_class.joblib
@@ -22,6 +22,7 @@ Saídas:
     results/figures/confusion_matrix_xgboost_estado_operacional.png
 """
 
+import argparse
 import json
 import os
 import sys
@@ -42,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
 from config import (
-    FEATURES_WINDOW_PATH,
+    FEATURES_BY_FILTER,
     FIGURES_DIR,
     METRICS_DIR,
     MODELS_DIR,
@@ -56,19 +57,32 @@ from src.evaluation import plot_confusion_matrix, print_classification_report
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--filter", choices=["gaussian", "statistical", "none"],
+        default="gaussian", dest="filter_type",
+        help="Tipo de filtro aplicado ao sinal (padrão: gaussian)",
+    )
+    args = parser.parse_args()
+    filter_type = args.filter_type
+    suffix = f"_{filter_type}" if filter_type != "gaussian" else ""
+
+    data_path = FEATURES_BY_FILTER[filter_type]
+
     print("=" * 60)
-    print("  Treinamento: XGBoost — Estado Operacional (17 classes)")
+    print(f"  Treinamento: XGBoost — Estado Operacional (17 classes)")
+    print(f"  Filtro: {filter_type}")
     print(f"  Inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
     # ── Carregar features ─────────────────────────────────────────────────────
     print("\n[1/5] Carregando features...")
-    if not FEATURES_WINDOW_PATH.exists():
-        print(f"ERRO: {FEATURES_WINDOW_PATH} nao encontrado.")
+    if not data_path.exists():
+        print(f"ERRO: {data_path} nao encontrado.")
         print("Execute primeiro: python scripts/run_pipeline_window_class.py")
         sys.exit(1)
 
-    df = pd.read_parquet(FEATURES_WINDOW_PATH)
+    df = pd.read_parquet(data_path)
     META_COLS = ["instance_id", "fault_class", "window_label", "source_type", "window_start"]
     feature_cols = [c for c in df.columns if c not in META_COLS]
 
@@ -89,13 +103,13 @@ def main():
     imputer = SimpleImputer(strategy="median")
     X = imputer.fit_transform(X)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(imputer, MODELS_DIR / "imputer_xgb_window_class.joblib")
+    joblib.dump(imputer, MODELS_DIR / f"imputer_xgb_window_class{suffix}.joblib")
 
     # ── Codificar labels para intervalo [0, n_classes-1] ─────────────────────
     # XGBoost exige labels contiguos. Os originais 101-109 causariam erro.
     le = LabelEncoder()
     y_enc = le.fit_transform(y_orig)   # ex: 101 -> 10, 102 -> 11, ...
-    joblib.dump(le, MODELS_DIR / "label_encoder_window_class.joblib")
+    joblib.dump(le, MODELS_DIR / f"label_encoder_window_class{suffix}.joblib")
     n_classes = len(le.classes_)
     print(f"  LabelEncoder: {len(classes_orig)} classes mapeadas para [0, {n_classes-1}]")
     print(f"  Mapeamento: {dict(zip(le.classes_.tolist(), range(n_classes)))}")
@@ -150,7 +164,7 @@ def main():
     print(f"  Melhores parametros: {best_params}")
 
     # ── Salvar modelo ─────────────────────────────────────────────────────────
-    model_path = MODELS_DIR / "xgboost_window_class.joblib"
+    model_path = MODELS_DIR / f"xgboost_window_class{suffix}.joblib"
     joblib.dump(best_xgb, model_path)
     print(f"  Modelo salvo: {model_path}")
 
@@ -196,17 +210,15 @@ def main():
     print(f"  F1-weighted: {f1_weighted:.4f}")
     print(f"  Accuracy   : {acc:.4f}")
 
-    print_classification_report(
-        y_true_all, y_pred_all,
-        model_name="XGBoost Estado Operacional",
-    )
+    model_label = f"XGBoost Estado Operacional ({filter_type})" if filter_type != "gaussian" else "XGBoost Estado Operacional"
+    print_classification_report(y_true_all, y_pred_all, model_name=model_label)
 
     # ── Matriz de confusão ────────────────────────────────────────────────────
     print("\n[5/5] Plotando matriz de confusao...")
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     plot_confusion_matrix(
         y_true_all, y_pred_all,
-        model_name="XGBoost Estado Operacional",
+        model_name=f"xgboost_window_class{suffix}_estado_operacional",
         label_map=WINDOW_CLASSES,
         save=True,
     )
@@ -221,7 +233,8 @@ def main():
     )
 
     metrics = {
-        "model": "xgboost_window_class",
+        "model": f"xgboost_window_class{suffix}",
+        "filter": filter_type,
         "trained_at": datetime.now().isoformat(),
         "dataset": {
             "n_windows":   int(len(df)),
@@ -253,13 +266,13 @@ def main():
     }
 
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    metrics_path = METRICS_DIR / "xgboost_window_class_metrics.json"
+    metrics_path = METRICS_DIR / f"xgboost_window_class{suffix}_metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
     print(f"  Metricas salvas: {metrics_path}")
 
     pd.DataFrame(search.cv_results_).to_csv(
-        METRICS_DIR / "xgboost_window_class_cv_results.csv", index=False
+        METRICS_DIR / f"xgboost_window_class{suffix}_cv_results.csv", index=False
     )
 
     print("\n" + "=" * 60)

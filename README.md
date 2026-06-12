@@ -29,14 +29,15 @@ Pipeline completo de Machine Learning para **classificação do estado operacion
 
 Poços de petróleo offshore são monitorados por sensores de pressão e temperatura. Falhas como formação de hidratos, incrustação no choke e golfadas severas podem interromper a produção ou danificar equipamentos. A detecção precoce em tempo real é um problema crítico.
 
-Este projeto desenvolve e compara três abordagens de ML para classificar, a partir de uma **janela de 300 s de dados de sensores**, o estado operacional atual de um poço entre **17 classes** (operação normal, 9 eventos ativos e 7 estados transientes):
+Este projeto desenvolve e compara quatro abordagens de ML para classificar, a partir de uma **janela de 300 s de dados de sensores**, o estado operacional atual de um poço entre **17 classes** (operação normal, 9 eventos ativos e 7 estados transientes):
 
 | Abordagem | Modelos | Input |
 |-----------|---------|-------|
 | Ensemble com features artesanais | Random Forest, XGBoost | 88 features estatísticas |
-| Rede neural sobre série bruta | CNN-1D (FCN) | Série temporal raw (300 × 8) |
+| Rede neural convolucional | CNN-1D (FCN) | Série temporal raw (300 × 8) |
+| Rede neural híbrida | CNN-LSTM | Série temporal raw (300 × 8) |
 
-A comparação direta entre as duas abordagens é o eixo central do trabalho: **qual o ganho da engenharia de features manual sobre representações aprendidas automaticamente?**
+A comparação direta entre as abordagens é o eixo central do trabalho: **qual o ganho da engenharia de features manual sobre representações aprendidas automaticamente, e como a memória temporal da LSTM contribui em relação à CNN pura?**
 
 ---
 
@@ -111,7 +112,17 @@ Fully Convolutional Network treinada diretamente sobre a série temporal bruta:
 Conv1D(128, 8) → BN → Conv1D(256, 5) → BN → Conv1D(128, 3) → BN → GlobalAvgPool → Dense(17)
 ```
 
-- EarlyStopping monitorando F1-macro
+### CNN-LSTM
+
+Bloco convolucional reduz 300 → 75 timesteps (~4× mais rápido que LSTM pura), seguido de LSTM com memória temporal:
+
+```
+Conv1D(64,5)+BN+Pool → Conv1D(128,3)+BN+Pool → LSTM(64) → Dropout → Dense(17)
+```
+
+Hiperparâmetros otimizados via Optuna (TPE + MedianPruner) no script `tune_lstm.py`.
+
+- EarlyStopping monitorando F1-macro em todos os modelos de DL
 - Inferência em chunks de 8.192 janelas para evitar OOM
 
 ---
@@ -127,8 +138,9 @@ Conv1D(128, 8) → BN → Conv1D(256, 5) → BN → Conv1D(128, 3) → BN → Gl
 | XGBoost | Estatístico | 0.9067 | 0.9401 | 0.9402 |
 | **XGBoost** | **Gaussiano** | **0.9082** | 0.9361 | 0.9364 |
 | CNN-1D (FCN) | Gaussiano | 0.6685 | 0.7168 | 0.7107 |
+| CNN-LSTM | Gaussiano | — | — | — |
 
-> **XGBoost + filtro Gaussiano** é o melhor modelo global. A CNN-1D opera sem qualquer engenharia de features — a diferença de 24 p.p. evidencia o valor das features artesanais (em particular `diff1_std` e `diff2_std`) para detecção de estados transientes.
+> **XGBoost + filtro Gaussiano** é o melhor modelo global. A CNN-1D opera sem qualquer engenharia de features — a diferença de 24 p.p. evidencia o valor das features artesanais para detecção de estados transientes. Resultado da CNN-LSTM a ser preenchido após execução de `train_lstm.py`.
 
 ### Generalização — Nested CV (RF)
 
@@ -178,13 +190,13 @@ flow-assurance-ml/
 ├── scripts/
 │   ├── run_pipeline_window_class.py ← gera features_window_class.parquet
 │   ├── train_random_forest.py       ← RF diagnóstico (10 classes)
-│   ├── train_rf_window_class.py     ← RF estado operacional (17 classes)
+│   ├── train_rf_window_class.py     ← RF estado operacional [--filter]
 │   ├── train_rf_nested_cv.py        ← validação nested CV (300 fits)
 │   ├── train_xgboost.py             ← XGBoost diagnóstico (10 classes)
-│   ├── train_xgboost_window_class.py       ← XGBoost + filtro Gaussiano
-│   ├── train_xgboost_nofilter.py           ← XGBoost + sem filtro
-│   ├── train_xgboost_statistical.py        ← XGBoost + filtro estatístico
-│   ├── train_cnn1d.py               ← CNN-1D (FCN) sobre série bruta
+│   ├── train_xgboost_window_class.py ← XGBoost estado operacional [--filter]
+│   ├── train_cnn1d.py               ← CNN-1D (FCN) sobre série bruta [--filter]
+│   ├── train_lstm.py                ← CNN-LSTM sobre série bruta [--filter]
+│   ├── tune_lstm.py                 ← busca de hiperparâmetros Optuna [--filter]
 │   ├── plot_confusion_matrix.py     ← matrizes de confusão
 │   └── plot_shap_statistical_vs_nofilter.py ← comparação SHAP entre filtros
 │
@@ -199,17 +211,21 @@ flow-assurance-ml/
 │
 ├── data/processed/                  ← gerado localmente (não versionado)
 │   ├── cleaned.parquet
-│   ├── features.parquet             ← 10 classes (diagnóstico)
-│   └── features_window_class.parquet ← 17 classes (estado operacional)
+│   ├── features.parquet                        ← 10 classes (diagnóstico)
+│   ├── features_window_class.parquet           ← 17 classes, filtro Gaussiano
+│   ├── features_statistical_window_class.parquet ← idem, filtro estatístico
+│   └── features_nofilter_window_class.parquet  ← idem, sem filtro
 │
 ├── results/
 │   ├── models/                      ← modelos treinados (.joblib, não versionados)
 │   ├── metrics/                     ← métricas em JSON/CSV
 │   │   ├── rf_window_class_metrics.json
-│   │   ├── xgboost_window_class_metrics.json
-│   │   ├── xgboost_nofilter_metrics.json
-│   │   ├── xgboost_statistical_metrics.json
+│   │   ├── xgboost_window_class_metrics.json          ← filtro padrão
+│   │   ├── xgboost_window_class_statistical_metrics.json
+│   │   ├── xgboost_window_class_none_metrics.json
 │   │   ├── cnn1d_metrics.json
+│   │   ├── lstm_metrics.json
+│   │   ├── lstm_best_params.json                      ← saída do tune_lstm.py
 │   │   └── rf_nested_cv_results.json
 │   └── figures/
 │       ├── confusion_matrix/
@@ -275,6 +291,18 @@ Todas as constantes ficam em `config.py`:
 | `RANDOM_STATE` | `42` | Semente global |
 | `N_SPLITS_CV` | `5` | Folds no GroupKFold |
 | `N_ITER_SEARCH` | `20` | Iterações do RandomizedSearchCV |
+| `GAUSSIAN_SIGMA` | `2.0` | Sigma do filtro Gaussiano |
+| `STATISTICAL_SIGMA` | `0.5` | Limiar do filtro estatístico adaptativo |
+
+Os scripts de treino aceitam `--filter {gaussian,statistical,none}` para selecionar o tipo de filtro em tempo de execução — sem necessidade de editar `config.py`:
+
+```bash
+python scripts/train_xgboost_window_class.py --filter statistical
+python scripts/train_lstm.py --filter none
+python scripts/tune_lstm.py --trials 30 --filter statistical
+```
+
+O padrão é sempre `gaussian`, mantendo compatibilidade com execuções anteriores.
 
 ---
 
@@ -285,7 +313,8 @@ Todas as constantes ficam em `config.py`:
 | pandas / numpy | Manipulação de séries temporais e DataFrames |
 | scikit-learn | Random Forest, GroupKFold, pré-processamento |
 | xgboost | Gradient boosting para classes desbalanceadas |
-| tensorflow / keras | CNN-1D (FCN) com pipeline tf.data |
+| tensorflow / keras | CNN-1D (FCN) e CNN-LSTM com pipeline tf.data |
+| optuna | Busca de hiperparâmetros (TPE + MedianPruner) |
 | shap | Interpretabilidade (TreeExplainer) |
 | pyarrow | Leitura/escrita de Parquet |
 | matplotlib / seaborn | Visualizações |
