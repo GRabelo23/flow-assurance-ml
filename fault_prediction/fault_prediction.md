@@ -8,7 +8,7 @@ Verificar se é possível prever consistentemente **qual tipo de falha um poço 
 
 ### 2.1 Filtro de janelas
 
-Somente janelas com `window_label == 0` (operação normal) foram utilizadas, janelas transientes e eventos ativos de falha foram descartados. Isso resulta em **102.040 janelas** de **1.117 instâncias**.
+Somente janelas com `window_label == 0` (operação normal) foram utilizadas. Janelas transientes e com eventos ativos de falha foram descartadas. Isso resulta em **102.040 janelas** de **1.117 instâncias**.
 
 ### 2.2 Rótulo de predição
 
@@ -113,7 +113,7 @@ Melhor configuração: `n_estimators=200`, `max_depth=8`, `learning_rate=0.1`, `
 | 8 | Hidrato Produção | 0,744 | **0,809** |
 | 9 | Hidrato Serviço | 0,934 | **0,961** |
 
-O XGBoost supera o RF em 6 das 8 classes. A maior diferença está na **DHSV (+0,065)** e no **Hidrato na Linha de Produção (+0,065)**. O RF leva vantagem apenas em BSW e PCK Restrição.
+O XGBoost supera o RF em 6 das 8 classes. A maior diferença está na **Fechamento Espúrio da DHSV (+0,065)** e no **Hidrato na Linha de Produção (+0,065)**. O RF leva vantagem apenas em **Aumento Abrupto de BSW (+0.004)** e **Restrição Rápida no PCK (+0.087)**.
 
 ### 3.3 Matrizes de Confusão
 
@@ -158,5 +158,5 @@ Calcula a contribuição individual de cada feature para cada predição. Difere
 ## 5. Observações
 
 - **Hidrato na Linha de Produção (8)** tem o menor F1 nos dois modelos (RF: 0,744; XGBoost: 0,809), com recall sistematicamente baixo. Os padrões de operação normal desses poços são frequentemente confundidos com operações normais da classe Hidrato na Linha de Serviço.
-- **PCK Restrição (6)** é o único caso em que o RF (0,955) supera significativamente o XGBoost (0,868), com queda de precisão no XGBoost, possivelmente por desbalanceamento na divisão dos folds.
+- **Restrição Rápida no PCK (6)** é o único caso em que o RF (0,955) supera significativamente o XGBoost (0,868), com queda de precisão no XGBoost, possivelmente por desbalanceamento na divisão dos folds.
 - O resultado geral indica que **padrões detectáveis já existem na fase de operação normal**, antes de qualquer transiente, para a maioria dos tipos de falha.
