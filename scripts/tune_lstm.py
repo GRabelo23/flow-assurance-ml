@@ -180,17 +180,18 @@ class MacroF1PruningCallback(tf.keras.callbacks.Callback):
     """
     _CHUNK = 8_192
 
-    def __init__(self, X_val: np.ndarray, y_val: np.ndarray, trial: optuna.Trial) -> None:
+    def __init__(self, X_val: np.ndarray, y_val: np.ndarray, trial: optuna.Trial, batch_size: int = 512) -> None:
         super().__init__()
-        self._X     = X_val
-        self._y     = y_val
-        self._trial = trial
+        self._X          = X_val
+        self._y          = y_val
+        self._trial      = trial
+        self._batch_size = batch_size
 
     def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
         preds = []
         for start in range(0, len(self._X), self._CHUNK):
             chunk = self._X[start : start + self._CHUNK]
-            p = self.model.predict(chunk, batch_size=512, verbose=0)
+            p = self.model.predict(chunk, batch_size=self._batch_size, verbose=0)
             preds.append(np.argmax(p, axis=1))
         y_pred = np.concatenate(preds)
         f1 = f1_score(self._y, y_pred, average="macro", zero_division=0)
@@ -260,7 +261,7 @@ def make_objective(fold_data: dict):
                 steps_per_epoch=steps_per_epoch,
                 validation_data=(X_val, y_val),
                 callbacks=[
-                    MacroF1PruningCallback(X_val, y_val, trial),   # antes do EarlyStopping
+                    MacroF1PruningCallback(X_val, y_val, trial, batch_size=batch_size),
                     EarlyStopping(
                         monitor="val_f1_macro", mode="max",
                         patience=15, restore_best_weights=True,

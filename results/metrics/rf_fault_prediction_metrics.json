@@ -1,0 +1,86 @@
+{
+  "model": "rf_fault_prediction",
+  "trained_at": "2026-06-15T23:59:29.919106",
+  "dataset": {
+    "n_windows": 102040,
+    "n_features": 88,
+    "n_instances": 1117,
+    "n_classes": 8,
+    "filter": "none",
+    "window_filter": "window_label == 0 (operacao normal)"
+  },
+  "cv": {
+    "strategy": "GroupKFold(n_splits=5)",
+    "scoring": "f1_macro",
+    "best_score_cv": 0.9195
+  },
+  "best_params": {
+    "n_estimators": 200,
+    "min_samples_leaf": 1,
+    "max_features": "log2",
+    "max_depth": 10
+  },
+  "metrics_oof": {
+    "f1_macro": 0.9148,
+    "f1_weighted": 0.9538,
+    "accuracy": 0.9554
+  },
+  "per_class": {
+    "0": {
+      "name": "Normal",
+      "precision": 0.9754,
+      "recall": 0.982,
+      "f1": 0.9787,
+      "support": 59797
+    },
+    "1": {
+      "name": "Aumento Abrupto de BSW",
+      "precision": 0.9928,
+      "recall": 0.9476,
+      "f1": 0.9697,
+      "support": 6109
+    },
+    "2": {
+      "name": "Fechamento Espúrio da DHSV",
+      "precision": 0.9266,
+      "recall": 0.9019,
+      "f1": 0.9141,
+      "support": 938
+    },
+    "5": {
+      "name": "Perda Rápida de Produtividade",
+      "precision": 0.9816,
+      "recall": 0.7862,
+      "f1": 0.8731,
+      "support": 1763
+    },
+    "6": {
+      "name": "Restrição Rápida no PCK",
+      "precision": 1.0,
+      "recall": 0.9138,
+      "f1": 0.955,
+      "support": 2819
+    },
+    "7": {
+      "name": "Incrustação no PCK",
+      "precision": 0.9845,
+      "recall": 0.9176,
+      "f1": 0.9499,
+      "support": 7467
+    },
+    "8": {
+      "name": "Hidrato na Linha de Produção",
+      "precision": 0.9295,
+      "recall": 0.6203,
+      "f1": 0.744,
+      "support": 4822
+    },
+    "9": {
+      "name": "Hidrato na Linha de Serviço",
+      "precision": 0.8756,
+      "recall": 1.0,
+      "f1": 0.9337,
+      "support": 18325
+    }
+  }
+}

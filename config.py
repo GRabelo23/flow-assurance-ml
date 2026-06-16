@@ -60,17 +60,18 @@ FAULT_CLASSES = {
     9: "Hidrato na Linha de Serviço",
 }
 
-# Labels para a abordagem de rotulagem por estado operacional (19 classes)
-# 0=normal, 1-9=evento ativo, 101-109=transiente do evento correspondente
+# Labels para a abordagem de rotulagem por estado operacional (17 classes)
+# 0=normal, 1-9=evento ativo, 101-109=transiente (exceto 103 e 104: classes 3 e 4 não têm transiente)
 _FAULT_SHORT = {
     1: "BSW", 2: "DHSV", 3: "Golfadas", 4: "Inst. Fluxo",
     5: "Prod. Rapida", 6: "PCK Restrict.", 7: "PCK Incrust.",
     8: "Hidrato Prod.", 9: "Hidrato Serv.",
 }
+_FAULT_WITH_TRANSIENT = {k: v for k, v in _FAULT_SHORT.items() if k not in {3, 4}}
 WINDOW_CLASSES = {
     0: "Normal",
     **{k: f"{v} (Ativo)" for k, v in _FAULT_SHORT.items()},
-    **{100 + k: f"{v} (Trans.)" for k, v in _FAULT_SHORT.items()},
+    **{100 + k: f"{v} (Trans.)" for k, v in _FAULT_WITH_TRANSIENT.items()},
 }
 
 SOURCE_TYPES = {

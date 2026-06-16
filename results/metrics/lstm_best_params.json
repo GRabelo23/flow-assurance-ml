@@ -1,0 +1,9 @@
+{
+  "lstm_units": 128,
+  "dropout_rate": 0.23663567279816528,
+  "learning_rate": 0.0010866115799955207,
+  "batch_size": 512,
+  "best_val_f1_macro": 0.7620540063544822,
+  "best_trial": 12,
+  "n_trials_completed": 6
+}

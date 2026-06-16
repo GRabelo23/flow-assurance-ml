@@ -1,0 +1,110 @@
+Removido: cleaned.parquet
+Removido: features.parquet
+  Classe 0: Normal — 594 instâncias (12 lote(s) de ate 50)
+    Lote 1/12 (50 inst)... 1,081,581 linhas
+    -> 7,134 janelas
+    Lote 2/12 (50 inst)... 993,835 linhas
+    -> 6,548 janelas
+    Lote 3/12 (50 inst)... 1,063,250 linhas
+    -> 7,017 janelas
+    Lote 4/12 (50 inst)... 1,074,402 linhas
+    -> 7,087 janelas
+    Lote 5/12 (50 inst)... 1,064,007 linhas
+    -> 7,016 janelas
+    Lote 6/12 (50 inst)... 1,073,611 linhas
+    -> 7,079 janelas
+    Lote 7/12 (50 inst)... 943,900 linhas
+    -> 6,219 janelas
+    Lote 8/12 (50 inst)... 777,334 linhas
+    -> 5,108 janelas
+    Lote 9/12 (50 inst)... 902,914 linhas
+    -> 5,944 janelas
+    Lote 10/12 (50 inst)... 1,074,408 linhas
+    -> 7,083 janelas
+    Lote 11/12 (50 inst)... 1,051,163 linhas
+    -> 4,960 janelas
+    Lote 12/12 (44 inst)... 1,057,778 linhas
+    -> 953 janelas
+  Classe 1: Aumento Abrupto de BSW — 128 instâncias (3 lote(s) de ate 50)
+    Lote 1/3 (50 inst)... 3,767,981 linhas
+    -> 25,051 janelas
+    Lote 2/3 (50 inst)... 3,143,955 linhas
+    -> 20,865 janelas
+    Lote 3/3 (28 inst)... 2,195,171 linhas
+    -> 14,581 janelas
+  Classe 2: Fechamento Espúrio da DHSV — 38 instâncias (1 lote(s) de ate 50)
+    -> 4,767 janelas
+  Classe 3: Golfadas Severas — 106 instâncias (3 lote(s) de ate 50)
+    Lote 1/3 (50 inst)... 2,773,950 linhas
+    -> 18,421 janelas
+    Lote 2/3 (50 inst)... 2,046,340 linhas
+    -> 13,569 janelas
+    Lote 3/3 (6 inst)... 128,989 linhas
+    -> 851 janelas
+  Classe 4: Instabilidade de Fluxo — 343 instâncias (7 lote(s) de ate 50)
+    Lote 1/7 (50 inst)... 541,911 linhas
+    -> 3,523 janelas
+    Lote 2/7 (50 inst)... 537,337 linhas
+    -> 3,499 janelas
+    Lote 3/7 (50 inst)... 536,999 linhas
+    -> 3,497 janelas
+    Lote 4/7 (50 inst)... 537,648 linhas
+    -> 3,500 janelas
+    Lote 5/7 (50 inst)... 537,350 linhas
+    -> 2,729 janelas
+    Lote 6/7 (50 inst)... 536,762 linhas
+    Lote 7/7 (43 inst)... 461,676 linhas
+    -> 1,470 janelas
+  Classe 5: Perda Rápida de Produtividade — 450 instâncias (9 lote(s) de ate 50)
+    Lote 1/9 (50 inst)... 1,464,951 linhas
+    -> 9,700 janelas
+    Lote 2/9 (50 inst)... 1,464,951 linhas
+    -> 9,700 janelas
+    Lote 3/9 (50 inst)... 1,464,951 linhas
+    -> 9,700 janelas
+    Lote 4/9 (50 inst)... 1,464,950 linhas
+    -> 9,700 janelas
+    Lote 5/9 (50 inst)... 1,464,951 linhas
+    -> 9,700 janelas
+    Lote 6/9 (50 inst)... 1,464,952 linhas
+    -> 9,700 janelas
+    Lote 7/9 (50 inst)... 1,464,952 linhas
+    -> 9,700 janelas
+    Lote 8/9 (50 inst)... 1,464,950 linhas
+    -> 9,700 janelas
+    Lote 9/9 (50 inst)... 1,582,069 linhas
+    -> 10,479 janelas
+  Classe 6: Restrição Rápida no PCK — 221 instâncias (5 lote(s) de ate 50)
+    Lote 1/5 (50 inst)... 1,349,950 linhas
+    -> 8,900 janelas
+    Lote 2/5 (50 inst)... 1,349,951 linhas
+    -> 8,901 janelas
+    Lote 3/5 (50 inst)... 1,349,951 linhas
+    -> 8,901 janelas
+    Lote 4/5 (50 inst)... 1,349,952 linhas
+    -> 8,902 janelas
+    Lote 5/5 (21 inst)... 482,463 linhas
+    -> 3,179 janelas
+  Classe 7: Incrustação no PCK — 46 instâncias (1 lote(s) de ate 50)
+    -> 58,099 janelas
+  Classe 8: Hidrato na Linha de Produção — 95 instâncias (2 lote(s) de ate 50)
+    Lote 1/2 (50 inst)... 1,349,951 linhas
+    -> 8,901 janelas
+    Lote 2/2 (45 inst)... 5,646,004 linhas
+    -> 28,925 janelas
+  Classe 9: Hidrato na Linha de Serviço — 207 instâncias (5 lote(s) de ate 50)
+    Lote 1/5 (50 inst)... 2,248,350 linhas
+    -> 14,891 janelas
+    Lote 2/5 (50 inst)... 2,155,554 linhas
+    -> 14,275 janelas
+    Lote 3/5 (50 inst)... 2,441,951 linhas
+    -> 16,181 janelas
+    Lote 4/5 (50 inst)... 2,389,792 linhas
+    -> 13,245 janelas
+    Lote 5/5 (7 inst)... 245,580 linhas
+    -> 1,627 janelas
+
+Pipeline concluido!
+  Dados limpos -> D:\Documentos\UnB\Projeto Final de Curso\TCC\data\processed\cleaned.parquet
+  Features     -> D:\Documentos\UnB\Projeto Final de Curso\TCC\data\processed\features.parquet (471,477 janelas)
+Pipeline concluido!
