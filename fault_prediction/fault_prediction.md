@@ -68,7 +68,7 @@ O XGBoost supera o RF em 6 das 8 classes. A maior diferença está na **DHSV (+0
 
 | RF | XGBoost |
 |:---:|:---:|
-| ![RF](../results/figures/fault_prediction/rf/rf_confusion_matrix_fault_prediction.png) | ![XGBoost](../results/figures/fault_prediction/xgb/xgb_confusion_matrix_fault_prediction.png) |
+| ![RF](rf/rf_confusion_matrix_fault_prediction.png) | ![XGBoost](xgb/xgb_confusion_matrix_fault_prediction.png) |
 
 ---
 
@@ -80,19 +80,19 @@ Três métodos foram utilizados para entender quais features mais contribuem par
 
 Mede o quanto cada feature reduz a impureza (Gini) em média ao longo de todas as árvores da floresta. É rápido e embutido no modelo, mas tende a favorecer features com alta variância ou muitas categorias.
 
-![MDI RF](../results/figures/fault_prediction/rf/mdi_rf_fault_prediction.png)
+![MDI RF](rf/mdi_rf_fault_prediction.png)
 
 ### 2. Permutation Importance (RF)
 
 Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto que o MDI para features correlacionadas, mas computacionalmente mais caro (10 repetições).
 
-![Perm RF](../results/figures/fault_prediction/rf/perm_rf_fault_prediction.png)
+![Perm RF](rf/perm_rf_fault_prediction.png)
 
 ### 3. XGBoost Gain
 
 Mede o ganho médio de precisão por cada divisão que utilizou aquela feature. Das três métricas nativas do XGBoost (weight, gain, cover), o **gain** é a mais informativa: uma feature pode ser usada poucas vezes (baixo weight) mas em divisões muito decisivas (alto gain).
 
-![XGBoost Gain](../results/figures/fault_prediction/xgb/xgb_gain_fault_prediction.png)
+![XGBoost Gain](xgb/xgb_gain_fault_prediction.png)
 
 ### 4. SHAP — SHapley Additive exPlanations
 
@@ -100,7 +100,7 @@ Calcula a contribuição individual de cada feature para cada predição, com ba
 
 | RF | XGBoost |
 |:---:|:---:|
-| ![SHAP RF](../results/figures/fault_prediction/rf/shap_bar_rf_fault_prediction.png) | ![SHAP XGBoost](../results/figures/fault_prediction/xgb/shap_bar_xgboost_fault_prediction.png) |
+| ![SHAP RF](rf/shap_bar_rf_fault_prediction.png) | ![SHAP XGBoost](xgb/shap_bar_xgboost_fault_prediction.png) |
 
 ---
 
