@@ -129,13 +129,13 @@ Compara os rótulos preditos pelos modelos com o rótulo real de cada amostra. O
 
 Quatro métodos foram utilizados para entender quais features mais contribuem para as predições:
 
-### 4.1 Random Forest - Mean Decrease in Impurity
+### 4.1 Random Forest - Mean Decrease in Impurity (MDI)
 
-Mede o quanto cada feature reduz a impureza (Gini) em média ao longo de todas as árvores da floresta. É rápido e embutido no modelo, mas tende a favorecer features com alta variância ou muitas categorias.
+Mede o quanto cada feature reduz a impureza (Gini) em média ao longo de todas as árvores. É rápido e embutido no modelo, mas tende a favorecer features com alta variância ou muitas categorias.
 
 ![MDI RF](figures/rf/rf_mdi_fault_prediction.png)
 
-### 4.2 Random Forest - Permutation Importance 
+### 4.2 Random Forest - Permutation Importance
 
 Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto que o MDI para features correlacionadas, mas computacionalmente mais caro (10 repetições, amostra de 10.000 janelas). O boxplot mostra a distribuição das 10 execuções.
 
@@ -145,7 +145,7 @@ Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto qu
 
 ### 4.3 XGBoost - Feature Importance
 
-O XGBoost oferece três métricas nativas de importância, que medem aspectos diferentes do papel de cada feature nas árvores:
+O XGBoost tem três métricas nativas de importância, que medem aspectos diferentes do papel de cada feature nas árvores:
 
 - **Gain:** ganho médio de acurácia por divisão que usou aquela feature.
 - **Weight:** quantas vezes a feature aparece como critério de divisão.
