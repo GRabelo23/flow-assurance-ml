@@ -148,7 +148,7 @@ Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto qu
 O XGBoost oferece três métricas nativas de importância, que medem aspectos diferentes do papel de cada feature nas árvores:
 
 - **Gain:** ganho médio de acurácia por divisão que usou aquela feature.
-- **Weight:** frequência de uso: quantas vezes a feature aparece como critério de divisão.
+- **Weight:** quantas vezes a feature aparece como critério de divisão.
 - **Cover:** número médio de amostras cobertas pelas divisões que usam aquela feature.
 
 ![XGBoost Gain](figures/xgb/xgb_importance_fault_prediction.png)
