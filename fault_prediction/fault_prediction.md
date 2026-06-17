@@ -117,6 +117,8 @@ O XGBoost supera o RF em 6 das 8 classes. A maior diferença está na **Fechamen
 
 ### 3.3 Matrizes de Confusão
 
+Compara os rótulos preditos pelos modelos com o rótulo real de cada amostra. Os valores são normalizados por linha: cada célula mostra a fração das amostras daquela classe real que foi predita como cada classe.
+
 | RF | XGBoost |
 |:---:|:---:|
 | ![RF](figures/rf/rf_confusion_matrix_fault_prediction.png) | ![XGBoost](figures/xgb/xgb_confusion_matrix_fault_prediction.png) |
@@ -125,38 +127,40 @@ O XGBoost supera o RF em 6 das 8 classes. A maior diferença está na **Fechamen
 
 ## 4. Interpretabilidade
 
-Três métodos foram utilizados para entender quais features mais contribuem para as predições:
+Quatro métodos foram utilizados para entender quais features mais contribuem para as predições:
 
-### 4.1 MDI: Mean Decrease in Impurity (RF)
+### 4.1 Random Forest - Mean Decrease in Impurity
 
 Mede o quanto cada feature reduz a impureza (Gini) em média ao longo de todas as árvores da floresta. É rápido e embutido no modelo, mas tende a favorecer features com alta variância ou muitas categorias.
 
-![MDI RF](figures/rf/mdi_rf_fault_prediction.png)
+![MDI RF](figures/rf/rf_mdi_fault_prediction.png)
 
-### 4.2 Permutation Importance (RF)
+### 4.2 Random Forest - Permutation Importance 
 
-Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto que o MDI para features correlacionadas, mas computacionalmente mais caro (10 repetições).
+Embaralha os valores de cada feature e mede a queda no F1-macro. Mais robusto que o MDI para features correlacionadas, mas computacionalmente mais caro (10 repetições, amostra de 10.000 janelas). O boxplot mostra a distribuição das 10 execuções.
 
-![Perm RF](figures/rf/perm_rf_fault_prediction.png)
+![Perm RF](figures/rf/rf_perm_boxplot_fault_prediction.png)
 
-### 4.3 XGBoost Gain
+ O topo é dominado por features de variação temporal (`diff1_std` e `diff2_std`), contrastando com o MDI onde features estáticas têm peso maior. Features com caixa cruzando zero (como `P-TPT_iqr`) têm importância instável e provavelmente não contribuem de forma confiável. Features com grandes intervalos IQR indicam sensibilidade ao subconjunto de dados.
 
-Mede o ganho médio de precisão por cada divisão que utilizou aquela feature. Das três métricas nativas do XGBoost (weight, gain, cover), o **gain** é a mais informativa: uma feature pode ser usada poucas vezes (baixo weight) mas em divisões muito decisivas (alto gain).
+### 4.3 XGBoost - Feature Importance
 
-![XGBoost Gain](figures/xgb/xgb_gain_fault_prediction.png)
+O XGBoost oferece três métricas nativas de importância, que medem aspectos diferentes do papel de cada feature nas árvores:
+
+- **Gain:** ganho médio de acurácia por divisão que usou aquela feature.
+- **Weight:** frequência de uso: quantas vezes a feature aparece como critério de divisão.
+- **Cover:** número médio de amostras cobertas pelas divisões que usam aquela feature.
+
+![XGBoost Gain](figures/xgb/xgb_importance_fault_prediction.png)
 
 ### 4.4 SHAP: SHapley Additive exPlanations
 
-Calcula a contribuição individual de cada feature para cada predição. Diferente dos métodos anteriores, o SHAP mostra **direção** (se a feature empurra a predição para uma classe ou para outra) e é consistente entre modelos diferentes.
+Calcula a contribuição marginal de cada feature para cada predição individual. Os valores exibidos são a média de |SHAP value| sobre todas as amostras e todas as classes, uma medida de importância global independente de modelo.
+
+> Para uma análise mais detalhada, podemos plotar os gráficos SHAP para cada classe individualmente.
 
 | RF | XGBoost |
 |:---:|:---:|
-| ![SHAP RF](figures/rf/shap_bar_rf_fault_prediction.png) | ![SHAP XGBoost](figures/xgb/shap_bar_xgboost_fault_prediction.png) |
+| ![SHAP RF](figures/rf/rf_shap_fault_prediction.png) | ![SHAP XGBoost](figures/xgb/xgb_shap_fault_prediction.png) |
 
----
-
-## 5. Observações
-
-- **Hidrato na Linha de Produção (8)** tem o menor F1 nos dois modelos (RF: 0,744; XGBoost: 0,809), com recall sistematicamente baixo. Os padrões de operação normal desses poços são frequentemente confundidos com operações normais da classe Hidrato na Linha de Serviço.
-- **Restrição Rápida no PCK (6)** é o único caso em que o RF (0,955) supera significativamente o XGBoost (0,868), com queda de precisão no XGBoost, possivelmente por desbalanceamento na divisão dos folds.
-- O resultado geral indica que **padrões detectáveis já existem na fase de operação normal**, antes de qualquer transiente, para a maioria dos tipos de falha.
+**Observação:** No Random Forest, o SHAP é calculado sobre as probabilidades de saída (valores entre 0 e 1). No XGBoost com `multi:softmax`, o SHAP é calculado sobre a saída bruta do modelo (espaço de log-odds), que é ilimitada e tem magnitude maior. Os dois gráficos não são comparáveis em escala absoluta, apenas o ranking das features importa na comparação entre modelos.
