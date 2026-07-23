@@ -13,6 +13,9 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import math
+
+import numba
 from scipy.ndimage import gaussian_filter1d
 from scipy.special import erf
 from scipy.stats import kurtosis, skew
@@ -50,6 +53,16 @@ def _apply_gaussian_filter(series: np.ndarray, sigma: float = GAUSSIAN_SIGMA) ->
     return smoothed
 
 
+@numba.njit(cache=True)
+def _statistical_pass(x: np.ndarray, denom: float) -> np.ndarray:
+    out = np.empty_like(x)
+    out[0] = x[0]
+    for i in range(1, len(x)):
+        alpha = min(math.erf(abs(out[i - 1] - x[i]) / denom), 1.0)
+        out[i] = (1.0 - alpha) * out[i - 1] + alpha * x[i]
+    return out
+
+
 def _apply_statistical_filter(series: np.ndarray, sigma: float = STATISTICAL_SIGMA) -> np.ndarray:
     """Filtro estatístico adaptativo (forward + backward), preservando NaN como NaN.
 
@@ -78,20 +91,12 @@ def _apply_statistical_filter(series: np.ndarray, sigma: float = STATISTICAL_SIG
     if mask.all():
         return series
 
-    valid = series[~mask].copy()
+    valid = series[~mask].copy().astype(np.float64)
     denom = np.sqrt(2.0) * 2.0 * sigma
 
-    def _pass(x: np.ndarray) -> np.ndarray:
-        out = np.empty_like(x)
-        out[0] = x[0]
-        for i in range(1, len(x)):
-            alpha = min(float(erf(abs(out[i - 1] - x[i]) / denom)), 1.0)
-            out[i] = (1.0 - alpha) * out[i - 1] + alpha * x[i]
-        return out
-
     # forward pass → backward pass (cancela o atraso de fase)
-    forward  = _pass(valid)
-    backward = _pass(forward[::-1])[::-1]
+    forward  = _statistical_pass(valid, denom)
+    backward = _statistical_pass(forward[::-1].copy(), denom)[::-1]
 
     smoothed = series.copy()
     smoothed[~mask] = backward

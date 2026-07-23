@@ -28,7 +28,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -51,6 +50,21 @@ from config import (
     WINDOW_CLASSES,
 )
 from src.evaluation import plot_confusion_matrix, print_classification_report
+
+
+def _impute_per_instance(X_raw: np.ndarray, groups: np.ndarray, feature_cols: list) -> np.ndarray:
+    """Preenche NaN com a mediana da própria instância para cada feature.
+
+    Como GroupKFold nunca divide janelas de uma mesma instância entre folds,
+    isso é equivalente à imputação por fold — sem vazamento de informação.
+    Fallback para 0.0 quando a feature é inteiramente NaN na instância
+    (valor neutro no espaço z-score normalizado).
+    """
+    df = pd.DataFrame(X_raw, columns=feature_cols)
+    df["_gid"] = groups
+    inst_med = df.groupby("_gid")[feature_cols].transform("median")
+    df[feature_cols] = df[feature_cols].fillna(inst_med).fillna(0.0)
+    return df[feature_cols].values
 
 
 def main():
@@ -96,11 +110,9 @@ def main():
         print(f"    {c:4d} ({WINDOW_CLASSES.get(c, '?'):<22}): {n:>8,} ({pct:.1f}%)")
 
     # ── Imputar NaN ───────────────────────────────────────────────────────────
-    print("\n[2/5] Imputando NaN com mediana...")
-    imputer = SimpleImputer(strategy="median")
-    X = imputer.fit_transform(X)
+    print("\n[2/5] Imputando NaN com mediana por instancia...")
+    X = _impute_per_instance(X, groups, feature_cols)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(imputer, MODELS_DIR / f"imputer_window_class{suffix}.joblib")
 
     # ── Busca de hiperparâmetros ──────────────────────────────────────────────
     print(f"\n[3/5] Busca de hiperparametros (RandomizedSearchCV)...")

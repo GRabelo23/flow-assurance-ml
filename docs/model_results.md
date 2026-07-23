@@ -18,6 +18,7 @@ Classes: 0=Normal, 1–9=Evento Ativo, 101–109=Transiente (103 e 104 ausentes 
 | XGBoost Estado Operacional | Sem Filtro | 0.9065 | 0.9339 | 0.9345 | 2026-04-29 |
 | **XGBoost Estado Operacional** | **Estatístico** | 0.9067 | **0.9401** | **0.9402** | 2026-04-29 |
 | CNN-1D (FCN) | Gaussiano | 0.6685 | 0.7168 | 0.7107 | 2026-05-04 |
+| CNN-LSTM | Gaussiano | 0.7058 | 0.7607 | 0.7557 | 2026-06-18 |
 
 ### Matrizes de Confusão 
 
@@ -398,3 +399,53 @@ Mesmo modelo, mesma busca de hiperparâmetros, mesmo GroupKFold. Apenas o pré-p
 - **Gap médio CNN vs XGBoost:** −0.240 p.p. em F1-macro (0.6685 vs 0.9082)
 - **Desvio entre folds ±0.005** — treinamento estável, resultado reproduzível
 
+---
+
+## CNN-LSTM — Estado Operacional (17 classes)
+
+**Script:** `scripts/train_lstm.py` | **Data:** 2026-06-18
+**Arquitetura:** Conv1D(64, k=5)+BN+ReLU+MaxPool(2) → Conv1D(128, k=3)+BN+ReLU+MaxPool(2) → LSTM(128) → Dropout(0.24) → Dense(17, softmax)
+**Filtro:** Gaussiano | **Validação:** GroupKFold(5) por instance_id, val=15% instâncias de treino, EarlyStopping(monitor=val_f1_macro)
+
+### Hiperparâmetros (Optuna)
+| Parâmetro | Valor |
+|-----------|-------|
+| lstm_units | 128 |
+| dropout_rate | 0.24 |
+| learning_rate | 1.09e-3 |
+| batch_size | 512 |
+
+### Métricas Globais
+| Métrica | CNN-LSTM | CNN-1D | XGBoost |
+|---------|:--------:|:------:|:-------:|
+| F1-macro | 0.7058 | 0.6685 | **0.9082** |
+| F1-weighted | 0.7607 | 0.7168 | **0.9361** |
+| Accuracy | 0.7557 | 0.7107 | **0.9364** |
+| F1 por fold | [0.690, 0.718, 0.652, 0.708, 0.720] | [0.660, 0.668, 0.673, 0.666, 0.675] | — |
+
+### Por Classe — CNN-LSTM vs CNN-1D vs XGBoost
+| Classe | Estado | CNN-LSTM | CNN-1D | XGBoost |
+|--------|--------|:--------:|:------:|:-------:|
+| 0 | Normal | 0.7459 | 0.6116 | **0.9145** |
+| 1 | BSW (Ativo) | 0.6768 | 0.6692 | **0.9389** |
+| 2 | DHSV (Ativo) | **0.9318** | 0.8961 | 0.9729 |
+| 3 | Golfadas (Ativo) | **0.9095** | 0.9170 | 0.9674 |
+| 4 | Inst. Fluxo (Ativo) | 0.6869 | 0.4727 | **0.8988** |
+| 5 | Prod. Rápida (Ativo) | **0.8992** | 0.8881 | 0.9819 |
+| 6 | PCK Restrict. (Ativo) | 0.5940 | 0.6924 | **0.9901** |
+| **7** | **PCK Incrust. (Ativo)** | 0.3202 | 0.1816 | **0.5712** |
+| 8 | Hidrato Prod. (Ativo) | 0.8006 | 0.7944 | **0.8497** |
+| 9 | Hidrato Serv. (Ativo) | **0.9544** | 0.9404 | 0.9895 |
+| 101 | BSW (Trans.) | 0.6961 | 0.6848 | **0.9289** |
+| 102 | DHSV (Trans.) | 0.4809 | 0.3853 | **0.8285** |
+| 105 | Prod. Rápida (Trans.) | 0.5701 | 0.5929 | **0.8899** |
+| 106 | PCK Restrict. (Trans.) | 0.4545 | 0.4515 | **0.9775** |
+| 107 | PCK Incrust. (Trans.) | **0.7061** | 0.6071 | 0.9047 |
+| 108 | Hidrato Prod. (Trans.) | 0.7544 | 0.7638 | **0.8724** |
+| 109 | Hidrato Serv. (Trans.) | **0.8170** | 0.8165 | 0.9628 |
+
+### Observações
+- **Melhor que CNN-1D em 12 de 17 classes** — a memória LSTM ajuda especialmente em transientes (107: +0.099, 102: +0.096)
+- **Pior que XGBoost em todas as classes** — o gap é maior em transientes (PCK Restrict. Trans.: 0.454 vs 0.978)
+- **PCK Restrição Ativo (classe 6):** CNN-LSTM pior que CNN-1D (0.594 vs 0.692) — única regressão relevante
+- **Desvio entre folds:** [0.690–0.720] — fold 3 mais fraco, variabilidade maior que a CNN-1D (±0.005), esperado dado o menor batch efetivo por instância em folds menores

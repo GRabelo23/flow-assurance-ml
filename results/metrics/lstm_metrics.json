@@ -1,0 +1,39 @@
+{
+  "model": "CNN_LSTM",
+  "filter": "gaussian",
+  "hyperparams": {
+    "lstm_units": 128,
+    "dropout_rate": 0.23663567279816528,
+    "learning_rate": 0.0010866115799955207,
+    "batch_size": 512
+  },
+  "f1_macro": 0.705789086475942,
+  "f1_weighted": 0.760683972921363,
+  "accuracy": 0.755680229384063,
+  "f1_per_fold": [
+    0.69,
+    0.7179,
+    0.6515955877478984,
+    0.7084285021410088,
+    0.7201458962301921
+  ],
+  "per_class_f1": {
+    "Normal": 0.7459426680233933,
+    "BSW (Ativo)": 0.6768464157087177,
+    "DHSV (Ativo)": 0.9317607413647851,
+    "Golfadas (Ativo)": 0.9094558638181337,
+    "Inst. Fluxo (Ativo)": 0.6869078654543143,
+    "Prod. Rapida (Ativo)": 0.8991702953983759,
+    "PCK Restrict. (Ativo)": 0.5939901842763219,
+    "PCK Incrust. (Ativo)": 0.32017229002153624,
+    "Hidrato Prod. (Ativo)": 0.8005672034842499,
+    "Hidrato Serv. (Ativo)": 0.9544460557512142,
+    "BSW (Trans.)": 0.6961032424043287,
+    "DHSV (Trans.)": 0.480865224625624,
+    "Prod. Rapida (Trans.)": 0.5701131698909124,
+    "PCK Restrict. (Trans.)": 0.4544802867383513,
+    "PCK Incrust. (Trans.)": 0.7061079219288174,
+    "Hidrato Prod. (Trans.)": 0.7544402609946973,
+    "Hidrato Serv. (Trans.)": 0.8170447802072397
+  }
+}

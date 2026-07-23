@@ -41,7 +41,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import GroupKFold, RandomizedSearchCV
 
@@ -55,6 +54,21 @@ from config import (
     RANDOM_STATE,
     WINDOW_CLASSES,
 )
+
+
+def _impute_per_instance(X_raw: np.ndarray, groups: np.ndarray, feature_cols: list) -> np.ndarray:
+    """Preenche NaN com a mediana da própria instância para cada feature.
+
+    Como GroupKFold nunca divide janelas de uma mesma instância entre folds,
+    isso é equivalente à imputação por fold — sem vazamento de informação.
+    Fallback para 0.0 quando a feature é inteiramente NaN na instância
+    (valor neutro no espaço z-score normalizado).
+    """
+    df = pd.DataFrame(X_raw, columns=feature_cols)
+    df["_gid"] = groups
+    inst_med = df.groupby("_gid")[feature_cols].transform("median")
+    df[feature_cols] = df[feature_cols].fillna(inst_med).fillna(0.0)
+    return df[feature_cols].values
 
 
 def main():
@@ -91,9 +105,8 @@ def main():
           f"{N_OUTER_SPLITS * N_ITER_INNER * N_INNER_SPLITS}")
 
     # ── Imputar NaN ───────────────────────────────────────────────────────────
-    print("\n[2/3] Imputando NaN com mediana...")
-    imputer = SimpleImputer(strategy="median")
-    X = imputer.fit_transform(X)
+    print("\n[2/3] Imputando NaN com mediana por instancia...")
+    X = _impute_per_instance(X, groups, feature_cols)
 
     # ── Grid IDÊNTICO ao flat CV ───────────────────────────────────────────────
     # Qualquer diferença no grid tornaria a comparação injusta.

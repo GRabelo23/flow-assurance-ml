@@ -93,6 +93,27 @@ KEY_SENSORS = [
     "QGL",        # Vazão de gás lift
 ]
 
+SENSOR_UNITS = {
+    "ABER-CKGL":    "%",
+    "ABER-CKP":     "%",
+    "P-ANULAR":     "Pa",
+    "P-JUS-BS":     "Pa",
+    "P-JUS-CKGL":   "Pa",
+    "P-JUS-CKP":    "Pa",
+    "P-MON-CKGL":   "Pa",
+    "P-MON-CKP":    "Pa",
+    "P-MON-SDV-P":  "Pa",
+    "P-PDG":        "Pa",
+    "PT-P":         "Pa",
+    "P-TPT":        "Pa",
+    "QBS":          "m³/s",
+    "QGL":          "m³/s",
+    "T-JUS-CKP":    "°C",
+    "T-MON-CKP":    "°C",
+    "T-PDG":        "°C",
+    "T-TPT":        "°C",
+}
+
 # ── Parâmetros da Etapa 2 — Limpeza ──────────────────────────────────────────
 
 FFILL_LIMIT = 60          # Forward-fill: máximo de 60 amostras (= 60 s a 1 Hz)

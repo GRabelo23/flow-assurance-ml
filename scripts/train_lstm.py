@@ -48,7 +48,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import (
     CLEANED_DATA_PATH,
-    FEATURES_WINDOW_PATH,
+    FEATURES_BY_FILTER,
     METRICS_DIR,
     KEY_SENSORS,
     WINDOW_SIZE,
@@ -249,8 +249,13 @@ def main() -> None:
         default="gaussian", dest="filter_type",
         help="Tipo de filtro aplicado ao sinal (padrão: gaussian)",
     )
+    parser.add_argument(
+        "--start-fold", type=int, default=0, dest="start_fold",
+        help="Retomar a partir deste fold (0-indexed). Ex: --start-fold 2 pula folds 1 e 2.",
+    )
     args = parser.parse_args()
     filter_type = args.filter_type
+    start_fold  = args.start_fold
     suffix = f"_{filter_type}" if filter_type != "gaussian" else ""
 
     tf.random.set_seed(RANDOM_STATE)
@@ -279,7 +284,7 @@ def main() -> None:
     print(f"\nFiltro: {filter_type}")
     print("Carregando metadados...")
     df_meta = pd.read_parquet(
-        FEATURES_WINDOW_PATH, columns=["instance_id", "window_label"]
+        FEATURES_BY_FILTER[filter_type], columns=["instance_id", "window_label"]
     )
     print(f"  {len(df_meta):,} janelas | {df_meta['instance_id'].nunique()} instâncias")
 
@@ -319,9 +324,28 @@ def main() -> None:
     oof_pred: list[np.ndarray] = []
     per_fold_f1: list[float]   = []
 
+    checkpoint_path = METRICS_DIR / f"lstm{suffix}_checkpoint.json"
+
+    if start_fold > 0:
+        oof_true_path = METRICS_DIR / f"lstm{suffix}_oof_true.npy"
+        oof_pred_path = METRICS_DIR / f"lstm{suffix}_oof_pred.npy"
+        if not (oof_true_path.exists() and oof_pred_path.exists() and checkpoint_path.exists()):
+            print("ERRO: arquivos de checkpoint não encontrados. Execute sem --start-fold.")
+            sys.exit(1)
+        oof_true = [np.load(oof_true_path)]
+        oof_pred = [np.load(oof_pred_path)]
+        with open(checkpoint_path, encoding="utf-8") as f:
+            ckpt = json.load(f)
+        per_fold_f1 = ckpt["per_fold_f1"]
+        print(f"\nRetomando do fold {start_fold + 1} — {len(per_fold_f1)} folds já concluídos.")
+        print(f"F1 por fold até agora: {[f'{v:.4f}' for v in per_fold_f1]}")
+
     for fold, (train_idx, test_idx) in enumerate(
         gkf.split(np.arange(len(df_meta)), groups=iid_per_row)
     ):
+        if fold < start_fold:
+            continue
+
         print(f"\n{'='*60}")
         print(f"FOLD {fold + 1} / 5")
         print(f"{'='*60}")
@@ -403,6 +427,8 @@ def main() -> None:
         METRICS_DIR.mkdir(parents=True, exist_ok=True)
         np.save(METRICS_DIR / f"lstm{suffix}_oof_true.npy", np.concatenate(oof_true))
         np.save(METRICS_DIR / f"lstm{suffix}_oof_pred.npy", np.concatenate(oof_pred))
+        with open(checkpoint_path, "w", encoding="utf-8") as f:
+            json.dump({"completed_folds": fold + 1, "per_fold_f1": per_fold_f1}, f)
 
         del X_val, y_val, X_test, y_test, model, ds_train
         gc.collect()

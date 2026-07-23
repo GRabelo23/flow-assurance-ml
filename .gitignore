@@ -39,6 +39,8 @@ env/
 
 # ── Claude Code (configuração local) ─────────────────────────────────────────
 .claude/
+.agents\skills
+skills-lock.json
 CLAUDE.md
 
 # ── README em inglês ──────────────────────────────────────────────────────────

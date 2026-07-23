@@ -1,0 +1,7 @@
+{
+  "lstm_units": 128,
+  "dropout_rate": 0.23663567279816528,
+  "learning_rate": 0.0010866115799955207,
+  "batch_size": 512,
+  "note": "Hiperparâmetros do filtro gaussiano reutilizados para o treino sem filtro"
+}
