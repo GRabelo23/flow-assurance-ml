@@ -39,7 +39,7 @@ env/
 
 # ── Claude Code (configuração local) ─────────────────────────────────────────
 .claude/
-.agents\skills
+.agents/
 skills-lock.json
 CLAUDE.md
 
